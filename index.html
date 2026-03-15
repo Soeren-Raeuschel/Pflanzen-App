@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Pflanzen" />
+  <meta name="theme-color" content="#F7F5F0" />
+  <title>Pflanzenpflege</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: #F7F5F0; font-family: 'DM Sans', sans-serif; color: #1A1A1A; overscroll-behavior: none; }
+    input, select, textarea, button { font-family: 'DM Sans', sans-serif; }
+    ::-webkit-scrollbar { display: none; }
+    #root { height: 100%; }
+    .safe-top { padding-top: env(safe-area-inset-top, 20px); }
+    .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+  <script>
+  const { useState, useEffect, useCallback } = React;
+
+  const PLANT_DB = {
+    "Monstera":   { icon: "🌿", water: 7,  light: "Indirekt",        tip: "Lass die Erde zwischen den Güssen vollständig abtrocknen. Wische die Blätter gelegentlich ab.", humidity: "Hoch",    difficulty: "Einfach" },
+    "Pothos":     { icon: "🍃", water: 7,  light: "Wenig bis indirekt", tip: "Äußerst pflegeleicht. Verträgt auch Dunkelheit und unregelmäßiges Gießen.", humidity: "Mittel",  difficulty: "Sehr einfach" },
+    "Ficus":      { icon: "🌳", water: 7,  light: "Hell, indirekt",   tip: "Nicht zu oft umstellen. Mag gleichmäßige Feuchtigkeit, aber keine Staunässe.", humidity: "Mittel",  difficulty: "Mittel" },
+    "Kaktus":     { icon: "🌵", water: 21, light: "Voll Sonne",       tip: "Selten gießen, besonders im Winter. Braucht sehr gut drainierte Erde.", humidity: "Niedrig", difficulty: "Sehr einfach" },
+    "Orchidee":   { icon: "🌸", water: 10, light: "Hell, indirekt",   tip: "Nur wenn die Erde fast trocken ist gießen. Nach der Blüte zurückschneiden.", humidity: "Hoch",    difficulty: "Anspruchsvoll" },
+    "Aloe Vera":  { icon: "🌱", water: 14, light: "Direkte Sonne",    tip: "Sehr wenig Wasser. Das Gel in den Blättern ist bei Verbrennungen hilfreich.", humidity: "Niedrig", difficulty: "Einfach" },
+    "Lavendel":   { icon: "💜", water: 10, light: "Volle Sonne",      tip: "Gut drainierter Boden wichtig. Fördert Schlaf und entspannt.", humidity: "Niedrig", difficulty: "Mittel" },
+    "Basilikum":  { icon: "🫚", water: 3,  light: "Voll Sonne",       tip: "Regelmäßig ernten fördert Wachstum. Nicht blühen lassen.", humidity: "Mittel",  difficulty: "Einfach" },
+    "Palme":      { icon: "🌴", water: 7,  light: "Hell, indirekt",   tip: "Regelmäßig gießen, aber keine Staunässe. Braucht viel Platz.", humidity: "Hoch",    difficulty: "Mittel" },
+    "Sukkulente": { icon: "🪴", water: 14, light: "Direkte Sonne",    tip: "Wenig Wasser, viel Licht. Im Winter fast gar nicht gießen.", humidity: "Niedrig", difficulty: "Sehr einfach" },
+    "Efeu":       { icon: "🍀", water: 7,  light: "Indirekt",         tip: "Luftreinigend. Regelmäßig gießen, aber nicht zu viel.", humidity: "Mittel",  difficulty: "Einfach" },
+    "Bonsai":     { icon: "🎋", water: 3,  light: "Hell, indirekt",   tip: "Regelmäßig und gleichmäßig gießen. Braucht spezielle Bonsai-Erde.", humidity: "Hoch",    difficulty: "Anspruchsvoll" },
+    "Andere":     { icon: "🌺", water: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel" },
+  };
+
+  const C = {
+    bg: "#F7F5F0", card: "#FFFFFF", text: "#1A1A1A", muted: "#8A8A8A",
+    accent: "#3D6B4F", accentLight: "#EAF2ED",
+    warn: "#E07B54", warnLight: "#FDF0EB", border: "#EBEBEB",
+  };
+
+  function daysSince(d) {
+    if (!d) return null;
+    return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  }
+  function needsWater(p) {
+    const d = daysSince(p.lastWatered);
+    if (d === null) return true;
+    return d >= (PLANT_DB[p.type]?.water || 7);
+  }
+  function daysUntil(p) {
+    const d = daysSince(p.lastWatered);
+    if (d === null) return 0;
+    return Math.max(0, (PLANT_DB[p.type]?.water || 7) - d);
+  }
+
+  // ── Label ──────────────────────────────────────────────
+  function Label({ children }) {
+    return React.createElement('p', {
+      style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }
+    }, children);
+  }
+
+  // ── BottomNav ──────────────────────────────────────────
+  function BottomNav({ active, onChange, onAdd }) {
+    const tabs = [{ id: "home", icon: "🏠", label: "Heute" }, { id: "plants", icon: "🪴", label: "Pflanzen" }];
+    return React.createElement('div', {
+      style: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: "rgba(247,245,240,0.95)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-around", padding: `10px 20px calc(10px + env(safe-area-inset-bottom, 0px))`, zIndex: 100 }
+    },
+      ...tabs.map(tab =>
+        React.createElement('button', {
+          key: tab.id, onClick: () => onChange(tab.id),
+          style: { background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 20px", opacity: active === tab.id ? 1 : 0.4 }
+        },
+          React.createElement('span', { style: { fontSize: 22 } }, tab.icon),
+          React.createElement('span', { style: { fontSize: 11, fontWeight: 500, color: active === tab.id ? C.accent : C.muted } }, tab.label)
+        )
+      ),
+      React.createElement('button', {
+        onClick: onAdd,
+        style: { background: C.accent, border: "none", borderRadius: 16, width: 52, height: 52, fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(61,107,79,0.3)", color: "#fff" }
+      }, "＋")
+    );
+  }
+
+  // ── EmptyState ─────────────────────────────────────────
+  function EmptyState({ onAdd }) {
+    return React.createElement('div', { style: { textAlign: "center", paddingTop: 60 } },
+      React.createElement('div', { style: { fontSize: 64, marginBottom: 16 } }, "🌱"),
+      React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 24, fontWeight: 500, marginBottom: 8 } }, "Noch keine Pflanzen"),
+      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 28 } }, "Füge deine erste Pflanze hinzu!"),
+      React.createElement('button', {
+        onClick: onAdd,
+        style: { background: C.accent, color: "#fff", border: "none", borderRadius: 14, padding: "14px 28px", fontSize: 15, fontWeight: 500, cursor: "pointer" }
+      }, "Pflanze hinzufügen")
+    );
+  }
+
+  // ── HomeView ───────────────────────────────────────────
+  function HomeView({ plants, onWater, onSelect, onAdd }) {
+    const thirsty = plants.filter(needsWater);
+    const upcoming = plants.filter(p => !needsWater(p)).sort((a, b) => daysUntil(a) - daysUntil(b)).slice(0, 4);
+
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
+      React.createElement('p', { style: { fontSize: 12, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 } },
+        new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })
+      ),
+      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 28 } },
+        "Pflanzenpflege 🌿"
+      ),
+      plants.length === 0 ? React.createElement(EmptyState, { onAdd }) :
+        React.createElement(React.Fragment, null,
+          // Thirsty section
+          thirsty.length > 0 && React.createElement('div', { style: { marginBottom: 28 } },
+            React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.warn, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, `Heute gießen (${thirsty.length})`),
+            React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
+              thirsty.map(p => {
+                const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
+                const d = daysSince(p.lastWatered);
+                return React.createElement('div', {
+                  key: p.id,
+                  style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: "1px solid #f5d8cc" },
+                  onClick: () => onSelect(p.id)
+                },
+                  React.createElement('span', { style: { fontSize: 30 } }, info.icon),
+                  React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, p.name),
+                    React.createElement('p', { style: { fontSize: 12, color: C.warn } }, d === null ? "Noch nie gegossen" : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`)
+                  ),
+                  React.createElement('button', {
+                    onClick: e => { e.stopPropagation(); onWater(p.id); },
+                    style: { background: C.warn, color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }
+                  }, "💧 Gießen")
+                );
+              })
+            )
+          ),
+          // All done
+          thirsty.length === 0 && React.createElement('div', {
+            style: { background: C.accentLight, borderRadius: 16, padding: "20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }
+          },
+            React.createElement('span', { style: { fontSize: 28 } }, "✅"),
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, "Alles erledigt!"),
+              React.createElement('p', { style: { fontSize: 13, color: C.muted } }, "Heute müssen keine Pflanzen gegossen werden.")
+            )
+          ),
+          // Upcoming
+          upcoming.length > 0 && React.createElement('div', { style: { marginBottom: 28 } },
+            React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Bald fällig"),
+            React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
+              upcoming.map(p => {
+                const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
+                const d = daysUntil(p);
+                return React.createElement('div', {
+                  key: p.id,
+                  style: { background: C.card, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.border}` },
+                  onClick: () => onSelect(p.id)
+                },
+                  React.createElement('span', { style: { fontSize: 28 } }, info.icon),
+                  React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, p.name),
+                    React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type)
+                  ),
+                  React.createElement('span', { style: { fontSize: 12, color: C.accent, background: C.accentLight, padding: "4px 10px", borderRadius: 8, fontWeight: 500 } },
+                    `in ${d} Tag${d !== 1 ? "en" : ""}`
+                  )
+                );
+              })
+            )
+          ),
+          // Stats
+          React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 } },
+            [
+              { label: "Pflanzen", value: plants.length, icon: "🪴" },
+              { label: "Heute gegossen", value: plants.filter(p => p.lastWatered && daysSince(p.lastWatered) === 0).length, icon: "💧" }
+            ].map(s => React.createElement('div', { key: s.label, style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+              React.createElement('span', { style: { fontSize: 22 } }, s.icon),
+              React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 28, fontWeight: 600, marginTop: 4 } }, s.value),
+              React.createElement('p', { style: { fontSize: 12, color: C.muted } }, s.label)
+            ))
+          )
+        )
+    );
+  }
+
+  // ── PlantsView ─────────────────────────────────────────
+  function PlantsView({ plants, onSelect, onAdd }) {
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
+      React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 } },
+        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Meine Pflanzen"),
+        React.createElement('button', { onClick: onAdd, style: { background: C.accent, color: "#fff", border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Neu")
+      ),
+      plants.length === 0 ? React.createElement(EmptyState, { onAdd }) :
+        React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
+          plants.map(p => {
+            const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
+            const water = needsWater(p);
+            return React.createElement('div', {
+              key: p.id, onClick: () => onSelect(p.id),
+              style: { background: C.card, borderRadius: 20, padding: "18px 16px", cursor: "pointer", border: `1px solid ${water ? "#f5d8cc" : C.border}`, position: "relative" }
+            },
+              water && React.createElement('div', { style: { position: "absolute", top: 10, right: 10, width: 8, height: 8, borderRadius: 4, background: C.warn } }),
+              React.createElement('span', { style: { fontSize: 36, display: "block", marginBottom: 10 } }, info.icon),
+              React.createElement('p', { style: { fontWeight: 500, fontSize: 15, marginBottom: 2 } }, p.name),
+              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 8 } }, p.type),
+              React.createElement('div', { style: { fontSize: 11, color: water ? C.warn : C.accent, fontWeight: 500 } },
+                water ? "💧 Gießen!" : `💧 in ${daysUntil(p)}d`
+              )
+            );
+          })
+        )
+    );
+  }
+
+  // ── PlantDetail ────────────────────────────────────────
+  function PlantDetail({ plant, onBack, onWater, onDelete }) {
+    const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
+    const water = needsWater(plant);
+    const days = daysSince(plant.lastWatered);
+    const [showDelete, setShowDelete] = useState(false);
+
+    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 40 } },
+      // Header
+      React.createElement('div', { style: { background: water ? C.warnLight : C.accentLight, padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 28px`, borderBottom: `1px solid ${C.border}` } },
+        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0 } }, "←"),
+        React.createElement('div', { style: { fontSize: 64, marginBottom: 12 } }, info.icon),
+        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 36, fontWeight: 500 } }, plant.name),
+        React.createElement('p', { style: { color: C.muted, fontSize: 15 } }, plant.type)
+      ),
+      React.createElement('div', { style: { padding: "24px 20px" } },
+        // Water status
+        water ?
+          React.createElement('div', { style: { background: C.warnLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #f5d8cc" } },
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontWeight: 500, color: C.warn } }, "Gießen fällig!"),
+              React.createElement('p', { style: { fontSize: 13, color: C.muted } }, days === null ? "Noch nie gegossen" : `Vor ${days} Tag${days !== 1 ? "en" : ""} gegossen`)
+            ),
+            React.createElement('button', { onClick: () => onWater(plant.id), style: { background: C.warn, color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Jetzt")
+          ) :
+          React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontWeight: 500, color: C.accent } }, `Nächstes Gießen in ${daysUntil(plant)} Tag${daysUntil(plant) !== 1 ? "en" : ""}`),
+              React.createElement('p', { style: { fontSize: 13, color: C.muted } }, days === 0 ? "Heute gegossen ✓" : `Vor ${days} Tag${days !== 1 ? "en" : ""} gegossen`)
+            ),
+            React.createElement('button', { onClick: () => onWater(plant.id), style: { background: "none", color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Gießen")
+          ),
+        // Care info grid
+        React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 } }, "Pflegeinfos"),
+          React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
+            [
+              { label: "Gießen", value: `Alle ${info.water} Tage`, icon: "💧" },
+              { label: "Licht", value: info.light, icon: "☀️" },
+              { label: "Luftfeuchtigkeit", value: info.humidity, icon: "🌡️" },
+              { label: "Schwierigkeit", value: info.difficulty, icon: "⭐" },
+            ].map(i => React.createElement('div', { key: i.label, style: { background: C.bg, borderRadius: 12, padding: "12px" } },
+              React.createElement('span', { style: { fontSize: 18 } }, i.icon),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, i.label),
+              React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, i.value)
+            ))
+          )
+        ),
+        // Tip
+        React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Pflegetipp"),
+          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, info.tip)
+        ),
+        // Notes
+        plant.notes && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Meine Notizen"),
+          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, plant.notes)
+        ),
+        // Delete
+        !showDelete ?
+          React.createElement('button', { onClick: () => setShowDelete(true), style: { width: "100%", background: "none", border: "1px solid #FFCDD2", color: "#E53935", borderRadius: 14, padding: "14px", fontSize: 14, cursor: "pointer", marginTop: 8 } }, "Pflanze entfernen") :
+          React.createElement('div', { style: { background: "#FFF5F5", borderRadius: 14, padding: "16px", border: "1px solid #FFCDD2", marginTop: 8 } },
+            React.createElement('p', { style: { fontSize: 14, marginBottom: 12, textAlign: "center" } }, "Wirklich löschen?"),
+            React.createElement('div', { style: { display: "flex", gap: 10 } },
+              React.createElement('button', { onClick: () => setShowDelete(false), style: { flex: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px", cursor: "pointer", fontSize: 14 } }, "Abbrechen"),
+              React.createElement('button', { onClick: () => onDelete(plant.id), style: { flex: 1, background: "#E53935", color: "#fff", border: "none", borderRadius: 10, padding: "12px", cursor: "pointer", fontSize: 14 } }, "Löschen")
+            )
+          )
+      )
+    );
+  }
+
+  // ── AddPlant ───────────────────────────────────────────
+  function AddPlant({ onAdd, onBack }) {
+    const [name, setName] = useState("");
+    const [type, setType] = useState("Monstera");
+    const [notes, setNotes] = useState("");
+    const [alreadyWatered, setAlreadyWatered] = useState(true);
+
+    const submit = () => {
+      if (!name.trim()) return;
+      onAdd({ id: Date.now().toString(), name: name.trim(), type, notes, lastWatered: alreadyWatered ? new Date().toISOString() : null });
+    };
+
+    const inputStyle = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", fontSize: 15, color: C.text, outline: "none", WebkitAppearance: "none" };
+
+    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
+      React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, borderBottom: `1px solid ${C.border}` } },
+        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0 } }, "←"),
+        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Neue Pflanze")
+      ),
+      React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 } },
+        // Name
+        React.createElement('div', null,
+          React.createElement(Label, null, "Name der Pflanze"),
+          React.createElement('input', { value: name, onChange: e => setName(e.target.value), placeholder: "z.B. Meine Monstera", style: inputStyle })
+        ),
+        // Type grid
+        React.createElement('div', null,
+          React.createElement(Label, null, "Pflanzenart"),
+          React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
+            Object.entries(PLANT_DB).map(([key, val]) =>
+              React.createElement('button', {
+                key, onClick: () => setType(key),
+                style: { background: type === key ? C.accentLight : C.card, border: `1.5px solid ${type === key ? C.accent : C.border}`, borderRadius: 12, padding: "10px 6px", cursor: "pointer", textAlign: "center" }
+              },
+                React.createElement('div', { style: { fontSize: 22 } }, val.icon),
+                React.createElement('div', { style: { fontSize: 11, color: type === key ? C.accent : C.muted, marginTop: 2, fontWeight: type === key ? 500 : 400 } }, key)
+              )
+            )
+          )
+        ),
+        // Notes
+        React.createElement('div', null,
+          React.createElement(Label, null, "Notizen (optional)"),
+          React.createElement('textarea', { value: notes, onChange: e => setNotes(e.target.value), placeholder: "Beobachtungen, Standort...", rows: 3, style: { ...inputStyle, resize: "none" } })
+        ),
+        // Checkbox
+        React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, background: C.card, borderRadius: 14, padding: "14px 16px", border: `1px solid ${C.border}` } },
+          React.createElement('input', { type: "checkbox", id: "watered", checked: alreadyWatered, onChange: e => setAlreadyWatered(e.target.checked), style: { width: 18, height: 18, accentColor: C.accent, cursor: "pointer" } }),
+          React.createElement('label', { htmlFor: "watered", style: { fontSize: 14, cursor: "pointer" } }, "Heute schon gegossen?")
+        ),
+        // Submit
+        React.createElement('button', {
+          onClick: submit, disabled: !name.trim(),
+          style: { background: name.trim() ? C.accent : C.border, color: "#fff", border: "none", borderRadius: 16, padding: "16px", fontSize: 16, fontWeight: 500, cursor: name.trim() ? "pointer" : "default" }
+        }, "Pflanze hinzufügen 🌿")
+      )
+    );
+  }
+
+  // ── App ────────────────────────────────────────────────
+  function App() {
+    const [plants, setPlants] = useState([]);
+    const [view, setView] = useState("home");
+    const [selectedPlant, setSelectedPlant] = useState(null);
+    const [showAdd, setShowAdd] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+
+    useEffect(() => {
+      try {
+        const saved = localStorage.getItem("pflanzenpflege_v1");
+        if (saved) setPlants(JSON.parse(saved));
+      } catch {}
+      setLoaded(true);
+    }, []);
+
+    const save = useCallback((updated) => {
+      setPlants(updated);
+      try { localStorage.setItem("pflanzenpflege_v1", JSON.stringify(updated)); } catch {}
+    }, []);
+
+    const waterPlant = id => save(plants.map(p => p.id === id ? { ...p, lastWatered: new Date().toISOString() } : p));
+    const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
+
+    if (!loaded) return React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
+      React.createElement('span', { style: { fontSize: 48 } }, "🌿")
+    );
+
+    if (showAdd) return React.createElement(AddPlant, { onAdd: p => { save([...plants, p]); setShowAdd(false); }, onBack: () => setShowAdd(false) });
+
+    if (selectedPlant) {
+      const plant = plants.find(p => p.id === selectedPlant);
+      if (!plant) { setSelectedPlant(null); return null; }
+      return React.createElement(PlantDetail, { plant, onBack: () => setSelectedPlant(null), onWater: waterPlant, onDelete: deletePlant });
+    }
+
+    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
+      view === "home" && React.createElement(HomeView, { plants, onWater: waterPlant, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
+      view === "plants" && React.createElement(PlantsView, { plants, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
+      React.createElement(BottomNav, { active: view, onChange: setView, onAdd: () => setShowAdd(true) })
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
+
+</body>
+</html>
