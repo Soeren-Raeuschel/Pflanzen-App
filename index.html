@@ -32,19 +32,29 @@
   const { useState, useEffect, useCallback } = React;
 
   const PLANT_DB = {
-    "Monstera":   { icon: "🌿", water: 7,  light: "Indirekt",        tip: "Lass die Erde zwischen den Güssen vollständig abtrocknen. Wische die Blätter gelegentlich ab.", humidity: "Hoch",    difficulty: "Einfach" },
-    "Pothos":     { icon: "🍃", water: 7,  light: "Wenig bis indirekt", tip: "Äußerst pflegeleicht. Verträgt auch Dunkelheit und unregelmäßiges Gießen.", humidity: "Mittel",  difficulty: "Sehr einfach" },
-    "Ficus":      { icon: "🌳", water: 7,  light: "Hell, indirekt",   tip: "Nicht zu oft umstellen. Mag gleichmäßige Feuchtigkeit, aber keine Staunässe.", humidity: "Mittel",  difficulty: "Mittel" },
-    "Kaktus":     { icon: "🌵", water: 21, light: "Voll Sonne",       tip: "Selten gießen, besonders im Winter. Braucht sehr gut drainierte Erde.", humidity: "Niedrig", difficulty: "Sehr einfach" },
-    "Orchidee":   { icon: "🌸", water: 10, light: "Hell, indirekt",   tip: "Nur wenn die Erde fast trocken ist gießen. Nach der Blüte zurückschneiden.", humidity: "Hoch",    difficulty: "Anspruchsvoll" },
-    "Aloe Vera":  { icon: "🌱", water: 14, light: "Direkte Sonne",    tip: "Sehr wenig Wasser. Das Gel in den Blättern ist bei Verbrennungen hilfreich.", humidity: "Niedrig", difficulty: "Einfach" },
-    "Lavendel":   { icon: "💜", water: 10, light: "Volle Sonne",      tip: "Gut drainierter Boden wichtig. Fördert Schlaf und entspannt.", humidity: "Niedrig", difficulty: "Mittel" },
-    "Basilikum":  { icon: "🫚", water: 3,  light: "Voll Sonne",       tip: "Regelmäßig ernten fördert Wachstum. Nicht blühen lassen.", humidity: "Mittel",  difficulty: "Einfach" },
-    "Palme":      { icon: "🌴", water: 7,  light: "Hell, indirekt",   tip: "Regelmäßig gießen, aber keine Staunässe. Braucht viel Platz.", humidity: "Hoch",    difficulty: "Mittel" },
-    "Sukkulente": { icon: "🪴", water: 14, light: "Direkte Sonne",    tip: "Wenig Wasser, viel Licht. Im Winter fast gar nicht gießen.", humidity: "Niedrig", difficulty: "Sehr einfach" },
-    "Efeu":       { icon: "🍀", water: 7,  light: "Indirekt",         tip: "Luftreinigend. Regelmäßig gießen, aber nicht zu viel.", humidity: "Mittel",  difficulty: "Einfach" },
-    "Bonsai":     { icon: "🎋", water: 3,  light: "Hell, indirekt",   tip: "Regelmäßig und gleichmäßig gießen. Braucht spezielle Bonsai-Erde.", humidity: "Hoch",    difficulty: "Anspruchsvoll" },
-    "Andere":     { icon: "🌺", water: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel" },
+    "Monstera":     { icon: "🌿", water: 7,  light: "Indirekt",        tip: "Lass die Erde zwischen den Güssen vollständig abtrocknen. Wische die Blätter gelegentlich ab.", humidity: "Hoch",    difficulty: "Einfach", description: "Bekannt für ihre großen, gefensterten Blätter.", origin: "Zentral- und Südamerika" },
+    "Pothos":       { icon: "🍃", water: 7,  light: "Wenig bis indirekt", tip: "Äußerst pflegeleicht. Verträgt auch Dunkelheit und unregelmäßiges Gießen.", humidity: "Mittel",  difficulty: "Sehr einfach", description: "Eine kletternde oder hängende Pflanze mit herzförmigen Blättern.", origin: "Südostasien" },
+    "Ficus":        { icon: "🌳", water: 7,  light: "Hell, indirekt",   tip: "Nicht zu oft umstellen. Mag gleichmäßige Feuchtigkeit, aber keine Staunässe.", humidity: "Mittel",  difficulty: "Mittel", description: "Ein beliebter Zimmerbaum mit glänzenden Blättern.", origin: "Südostasien, Australien" },
+    "Kaktus":       { icon: "🌵", water: 21, light: "Voll Sonne",       tip: "Selten gießen, besonders im Winter. Braucht sehr gut drainierte Erde.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wasserspeichernde Pflanze, perfekt für sonnige Plätze.", origin: "Amerika" },
+    "Orchidee":     { icon: "🌸", water: 10, light: "Hell, indirekt",   tip: "Nur wenn die Erde fast trocken ist gießen. Nach der Blüte zurückschneiden.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Elegante Blütenpflanze mit speziellen Pflegeansprüchen.", origin: "Tropen weltweit" },
+    "Aloe Vera":    { icon: "🌱", water: 14, light: "Direkte Sonne",    tip: "Sehr wenig Wasser. Das Gel in den Blättern ist bei Verbrennungen hilfreich.", humidity: "Niedrig", difficulty: "Einfach", description: "Heilpflanze mit dickfleischigen, dornigen Blättern.", origin: "Arabische Halbinsel" },
+    "Lavendel":     { icon: "💜", water: 10, light: "Volle Sonne",      tip: "Gut drainierter Boden wichtig. Fördert Schlaf und entspannt.", humidity: "Niedrig", difficulty: "Mittel", description: "Duftende Pflanze mit lila Blüten, liebt die Sonne.", origin: "Mittelmeerraum" },
+    "Basilikum":    { icon: "🫚", water: 3,  light: "Voll Sonne",       tip: "Regelmäßig ernten fördert Wachstum. Nicht blühen lassen.", humidity: "Mittel",  difficulty: "Einfach", description: "Beliebtes Küchenkraut für frische Gerichte.", origin: "Tropisches Asien" },
+    "Palme":        { icon: "🌴", water: 7,  light: "Hell, indirekt",   tip: "Regelmäßig gießen, aber keine Staunässe. Braucht viel Platz.", humidity: "Hoch",    difficulty: "Mittel", description: "Bringt tropisches Flair in jeden Raum.", origin: "Tropen und Subtropen" },
+    "Sukkulente":   { icon: "🪴", water: 14, light: "Direkte Sonne",    tip: "Wenig Wasser, viel Licht. Im Winter fast gar nicht gießen.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Pflegeleichte Pflanzen, die Wasser in ihren Blättern speichern.", origin: "Weltweit in trockenen Regionen" },
+    "Efeu":         { icon: "🍀", water: 7,  light: "Indirekt",         tip: "Luftreinigend. Regelmäßig gießen, aber nicht zu viel.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuste Kletterpflanze, die die Luft reinigt.", origin: "Europa, Westasien" },
+    "Bonsai":       { icon: "🎋", water: 3,  light: "Hell, indirekt",   tip: "Regelmäßig und gleichmäßig gießen. Braucht spezielle Bonsai-Erde.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Die Kunst, Bäume in Miniaturform zu ziehen.", origin: "Ostasien" },
+    "Rose":         { icon: "🌹", water: 5,  light: "Voll Sonne",      tip: "Verblühtes regelmäßig entfernen. Im Frühjahr zurückschneiden.", humidity: "Mittel",  difficulty: "Mittel", description: "Die Königin der Blumen mit wunderschönen Blüten.", origin: "Nördliche Hemisphäre" },
+    "Spuckpalme":   { icon: "🌵", water: 7,  light: "Hell, indirekt",   tip: "Vorsicht beim Gießen, mag keine Staunässe. Schleudert ihre Samen weg.", humidity: "Mittel",  difficulty: "Einfach", description: "Interessante Pflanze, die ihre Samen meterweit verschießen kann.", origin: "Madagaskar" },
+    "Gummibaum":    { icon: "🌳", water: 10, light: "Hell, indirekt",   tip: "Blätter regelmäßig abwischen, um Staub zu entfernen.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuster Klassiker mit großen, ledrigen Blättern.", origin: "Indien, Indonesien" },
+    "Thymian":      { icon: "🌿", water: 5,  light: "Voll Sonne",      tip: "Wenig gießen, mag es eher trocken und karg.", humidity: "Niedrig", difficulty: "Einfach", description: "Würziger Bodendecker für sonnige Standorte.", origin: "Mittelmeerraum" },
+    "Minze":        { icon: "🌱", water: 3,  light: "Halbschatten bis Sonne", tip: "Braucht viel Wasser und breitet sich schnell aus.", humidity: "Mittel",  difficulty: "Einfach", description: "Erfrischendes Kraut, ideal für Tees und Kaltgetränke.", origin: "Weltweit (gemäßigte Zonen)" },
+    "Friedenslilie": { icon: "🤍", water: 5,  light: "Wenig bis indirekt", tip: "Lässt die Blätter hängen, wenn sie Wasser braucht.", humidity: "Hoch",    difficulty: "Einfach", description: "Elegante Pflanze mit weißen Hochblättern, die die Luft reinigt.", origin: "Tropen Amerikas und Südostasiens" },
+    "Drachenbaum":  { icon: "🎋", water: 10, light: "Hell, indirekt",   tip: "Verträgt keine direkte Mittagssonne. Wenig gießen.", humidity: "Mittel",  difficulty: "Einfach", description: "Palmenähnliche Pflanze mit schmalen, spitzen Blättern.", origin: "Tropisches Afrika" },
+    "Bogenhanf":    { icon: "🐍", water: 21, light: "Wenig bis Sonne",   tip: "Extrem robust. Lieber zu wenig als zu viel gießen.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Nahezu unkaputtbare Pflanze mit aufrecht wachsenden Blättern.", origin: "Westafrika" },
+    "Elefantenfuß": { icon: "🐘", water: 14, light: "Hell bis sonnig",   tip: "Speichert Wasser im Stamm. Nur gießen, wenn die Erde trocken ist.", humidity: "Niedrig", difficulty: "Einfach", description: "Charakteristische Pflanze mit verdicktem Stammfuß.", origin: "Mexiko" },
+    "Zamioculcas":  { icon: "🍃", water: 14, light: "Wenig bis hell",   tip: "Sehr genügsam. Verträgt dunkle Standorte und wenig Wasser.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wachsartig glänzende Blätter und extrem pflegeleicht.", origin: "Ostafrika" },
+    "Andere":       { icon: "🌺", water: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
   };
 
   const C = {
@@ -274,6 +284,16 @@
               React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, i.value)
             ))
           )
+        ),
+        // Description
+        info.description && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Beschreibung"),
+          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, info.description)
+        ),
+        // Origin
+        info.origin && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Herkunft"),
+          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, info.origin)
         ),
         // Tip
         React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
