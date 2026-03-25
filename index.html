@@ -32,29 +32,29 @@
   const { useState, useEffect, useCallback } = React;
 
   const PLANT_DB = {
-    "Monstera":     { icon: "🌿", water: 7,  light: "Indirekt",        tip: "Lass die Erde zwischen den Güssen vollständig abtrocknen. Wische die Blätter gelegentlich ab.", humidity: "Hoch",    difficulty: "Einfach", description: "Bekannt für ihre großen, gefensterten Blätter.", origin: "Zentral- und Südamerika" },
-    "Pothos":       { icon: "🍃", water: 7,  light: "Wenig bis indirekt", tip: "Äußerst pflegeleicht. Verträgt auch Dunkelheit und unregelmäßiges Gießen.", humidity: "Mittel",  difficulty: "Sehr einfach", description: "Eine kletternde oder hängende Pflanze mit herzförmigen Blättern.", origin: "Südostasien" },
-    "Ficus":        { icon: "🌳", water: 7,  light: "Hell, indirekt",   tip: "Nicht zu oft umstellen. Mag gleichmäßige Feuchtigkeit, aber keine Staunässe.", humidity: "Mittel",  difficulty: "Mittel", description: "Ein beliebter Zimmerbaum mit glänzenden Blättern.", origin: "Südostasien, Australien" },
-    "Kaktus":       { icon: "🌵", water: 21, light: "Voll Sonne",       tip: "Selten gießen, besonders im Winter. Braucht sehr gut drainierte Erde.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wasserspeichernde Pflanze, perfekt für sonnige Plätze.", origin: "Amerika" },
-    "Orchidee":     { icon: "🌸", water: 10, light: "Hell, indirekt",   tip: "Nur wenn die Erde fast trocken ist gießen. Nach der Blüte zurückschneiden.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Elegante Blütenpflanze mit speziellen Pflegeansprüchen.", origin: "Tropen weltweit" },
-    "Aloe Vera":    { icon: "🌱", water: 14, light: "Direkte Sonne",    tip: "Sehr wenig Wasser. Das Gel in den Blättern ist bei Verbrennungen hilfreich.", humidity: "Niedrig", difficulty: "Einfach", description: "Heilpflanze mit dickfleischigen, dornigen Blättern.", origin: "Arabische Halbinsel" },
-    "Lavendel":     { icon: "💜", water: 10, light: "Volle Sonne",      tip: "Gut drainierter Boden wichtig. Fördert Schlaf und entspannt.", humidity: "Niedrig", difficulty: "Mittel", description: "Duftende Pflanze mit lila Blüten, liebt die Sonne.", origin: "Mittelmeerraum" },
-    "Basilikum":    { icon: "🫚", water: 3,  light: "Voll Sonne",       tip: "Regelmäßig ernten fördert Wachstum. Nicht blühen lassen.", humidity: "Mittel",  difficulty: "Einfach", description: "Beliebtes Küchenkraut für frische Gerichte.", origin: "Tropisches Asien" },
-    "Palme":        { icon: "🌴", water: 7,  light: "Hell, indirekt",   tip: "Regelmäßig gießen, aber keine Staunässe. Braucht viel Platz.", humidity: "Hoch",    difficulty: "Mittel", description: "Bringt tropisches Flair in jeden Raum.", origin: "Tropen und Subtropen" },
-    "Sukkulente":   { icon: "🪴", water: 14, light: "Direkte Sonne",    tip: "Wenig Wasser, viel Licht. Im Winter fast gar nicht gießen.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Pflegeleichte Pflanzen, die Wasser in ihren Blättern speichern.", origin: "Weltweit in trockenen Regionen" },
-    "Efeu":         { icon: "🍀", water: 7,  light: "Indirekt",         tip: "Luftreinigend. Regelmäßig gießen, aber nicht zu viel.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuste Kletterpflanze, die die Luft reinigt.", origin: "Europa, Westasien" },
-    "Bonsai":       { icon: "🎋", water: 3,  light: "Hell, indirekt",   tip: "Regelmäßig und gleichmäßig gießen. Braucht spezielle Bonsai-Erde.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Die Kunst, Bäume in Miniaturform zu ziehen.", origin: "Ostasien" },
-    "Rose":         { icon: "🌹", water: 5,  light: "Voll Sonne",      tip: "Verblühtes regelmäßig entfernen. Im Frühjahr zurückschneiden.", humidity: "Mittel",  difficulty: "Mittel", description: "Die Königin der Blumen mit wunderschönen Blüten.", origin: "Nördliche Hemisphäre" },
-    "Spuckpalme":   { icon: "🌵", water: 7,  light: "Hell, indirekt",   tip: "Vorsicht beim Gießen, mag keine Staunässe. Schleudert ihre Samen weg.", humidity: "Mittel",  difficulty: "Einfach", description: "Interessante Pflanze, die ihre Samen meterweit verschießen kann.", origin: "Madagaskar" },
-    "Gummibaum":    { icon: "🌳", water: 10, light: "Hell, indirekt",   tip: "Blätter regelmäßig abwischen, um Staub zu entfernen.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuster Klassiker mit großen, ledrigen Blättern.", origin: "Indien, Indonesien" },
-    "Thymian":      { icon: "🌿", water: 5,  light: "Voll Sonne",      tip: "Wenig gießen, mag es eher trocken und karg.", humidity: "Niedrig", difficulty: "Einfach", description: "Würziger Bodendecker für sonnige Standorte.", origin: "Mittelmeerraum" },
-    "Minze":        { icon: "🌱", water: 3,  light: "Halbschatten bis Sonne", tip: "Braucht viel Wasser und breitet sich schnell aus.", humidity: "Mittel",  difficulty: "Einfach", description: "Erfrischendes Kraut, ideal für Tees und Kaltgetränke.", origin: "Weltweit (gemäßigte Zonen)" },
-    "Friedenslilie": { icon: "🤍", water: 5,  light: "Wenig bis indirekt", tip: "Lässt die Blätter hängen, wenn sie Wasser braucht.", humidity: "Hoch",    difficulty: "Einfach", description: "Elegante Pflanze mit weißen Hochblättern, die die Luft reinigt.", origin: "Tropen Amerikas und Südostasiens" },
-    "Drachenbaum":  { icon: "🎋", water: 10, light: "Hell, indirekt",   tip: "Verträgt keine direkte Mittagssonne. Wenig gießen.", humidity: "Mittel",  difficulty: "Einfach", description: "Palmenähnliche Pflanze mit schmalen, spitzen Blättern.", origin: "Tropisches Afrika" },
-    "Bogenhanf":    { icon: "🐍", water: 21, light: "Wenig bis Sonne",   tip: "Extrem robust. Lieber zu wenig als zu viel gießen.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Nahezu unkaputtbare Pflanze mit aufrecht wachsenden Blättern.", origin: "Westafrika" },
-    "Elefantenfuß": { icon: "🐘", water: 14, light: "Hell bis sonnig",   tip: "Speichert Wasser im Stamm. Nur gießen, wenn die Erde trocken ist.", humidity: "Niedrig", difficulty: "Einfach", description: "Charakteristische Pflanze mit verdicktem Stammfuß.", origin: "Mexiko" },
-    "Zamioculcas":  { icon: "🍃", water: 14, light: "Wenig bis hell",   tip: "Sehr genügsam. Verträgt dunkle Standorte und wenig Wasser.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wachsartig glänzende Blätter und extrem pflegeleicht.", origin: "Ostafrika" },
-    "Andere":       { icon: "🌺", water: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
+    "Monstera":     { icon: "🌿", watering_interval: 9,  light: "Hell, indirekt",   tip: "Die Erde sollte zwischendurch gut antrocknen. Staunässe unbedingt vermeiden.", humidity: "Hoch",    difficulty: "Einfach", description: "Bekannt für ihre großen, gefensterten Blätter.", origin: "Zentral- und Südamerika" },
+    "Pothos":       { icon: "🍃", watering_interval: 10, light: "Wenig bis indirekt", tip: "Sehr anpassungsfähig. Verzeiht es, wenn das Gießen mal vergessen wird.", humidity: "Mittel",  difficulty: "Sehr einfach", description: "Eine kletternde oder hängende Pflanze mit herzförmigen Blättern.", origin: "Südostasien" },
+    "Ficus":        { icon: "🌳", watering_interval: 7,  light: "Hell, indirekt",   tip: "Reagiert empfindlich auf Standortwechsel und Zugluft.", humidity: "Mittel",  difficulty: "Mittel", description: "Ein beliebter Zimmerbaum mit glänzenden Blättern.", origin: "Südostasien, Australien" },
+    "Kaktus":       { icon: "🌵", watering_interval: 25, light: "Volle Sonne",      tip: "Im Winter fast gar nicht gießen. Benötigt mineralisches Substrat.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wasserspeichernde Pflanze, perfekt für sonnige Plätze.", origin: "Amerika" },
+    "Orchidee":     { icon: "🌸", watering_interval: 8,  light: "Hell, indirekt",   tip: "Am besten den Topf für 15 Min. in kalkarmes Wasser tauchen, dann abtropfen lassen.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Elegante Blütenpflanze mit speziellen Pflegeansprüchen.", origin: "Tropen weltweit" },
+    "Aloe Vera":    { icon: "🌱", watering_interval: 18, light: "Direkte Sonne",    tip: "Gießen erst wenn das Substrat fast vollständig durchgetrocknet ist.", humidity: "Niedrig", difficulty: "Einfach", description: "Heilpflanze mit dickfleischigen, dornigen Blättern.", origin: "Arabische Halbinsel" },
+    "Lavendel":     { icon: "💜", watering_interval: 8,  light: "Volle Sonne",      tip: "Staunässe vermeiden, liebt kalkhaltigen, eher nährstoffarmen Boden.", humidity: "Niedrig", difficulty: "Mittel", description: "Duftende Pflanze mit lila Blüten, liebt die Sonne.", origin: "Mittelmeerraum" },
+    "Basilikum":    { icon: "🫚", watering_interval: 2,  light: "Volle Sonne",      tip: "Braucht täglich Kontrolle. Nie von oben auf die Blätter gießen.", humidity: "Mittel",  difficulty: "Mittel", description: "Beliebtes Küchenkraut für frische Gerichte.", origin: "Tropisches Asien" },
+    "Palme":        { icon: "🌴", watering_interval: 6,  light: "Hell, indirekt",   tip: "Der Wurzelballen sollte nie ganz austrocknen. Kalkarmes Wasser nutzen.", humidity: "Hoch",    difficulty: "Mittel", description: "Bringt tropisches Flair in jeden Raum.", origin: "Tropen und Subtropen" },
+    "Sukkulente":   { icon: "🪴", watering_interval: 20, light: "Direkte Sonne",    tip: "Blätter nicht mit Wasser benetzen, dies kann zu Fäulnis führen.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Pflegeleichte Pflanzen, die Wasser in ihren Blättern speichern.", origin: "Weltweit in trockenen Regionen" },
+    "Efeu":         { icon: "🍀", watering_interval: 7,  light: "Indirekt",         tip: "Mag es kühl. Regelmäßiges Besprühen beugt Spinnmilben vor.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuste Kletterpflanze, die die Luft reinigt.", origin: "Europa, Westasien" },
+    "Bonsai":       { icon: "🎋", watering_interval: 3,  light: "Hell, indirekt",   tip: "Durch die kleine Schale ist die Erde sehr schnell trocken. Täglich prüfen.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Die Kunst, Bäume in Miniaturform zu ziehen.", origin: "Ostasien" },
+    "Rose":         { icon: "🌹", watering_interval: 5,  light: "Volle Sonne",      tip: "Im Topf ist der Wasserbedarf sehr hoch. Direkt an der Basis gießen.", humidity: "Mittel",  difficulty: "Mittel", description: "Die Königin der Blumen mit wunderschönen Blüten.", origin: "Nördliche Hemisphäre" },
+    "Spuckpalme":   { icon: "🌵", watering_interval: 9,  light: "Hell, indirekt",   tip: "Vorsicht, der Milchsaft ist giftig und kann Hautreizungen verursachen.", humidity: "Mittel",  difficulty: "Einfach", description: "Interessante Pflanze, die ihre Samen meterweit verschießen kann.", origin: "Madagaskar" },
+    "Gummibaum":    { icon: "🌳", watering_interval: 8,  light: "Hell, indirekt",   tip: "Große Blätter regelmäßig feucht abwischen, damit sie atmen können.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuster Klassiker mit großen, ledrigen Blättern.", origin: "Indien, Indonesien" },
+    "Thymian":      { icon: "🌿", watering_interval: 9,  light: "Volle Sonne",      tip: "Sehr genügsam. Weniger Wasser fördert die Aromabildung.", humidity: "Niedrig", difficulty: "Einfach", description: "Würziger Bodendecker für sonnige Standorte.", origin: "Mittelmeerraum" },
+    "Minze":        { icon: "🌱", watering_interval: 3,  light: "Halbschatten",     tip: "Wuchert stark, im Topf ideal. Erde immer leicht feucht halten.", humidity: "Mittel",  difficulty: "Einfach", description: "Erfrischendes Kraut, ideal für Tees und Kaltgetränke.", origin: "Weltweit (gemäßigte Zonen)" },
+    "Friedenslilie": { icon: "🤍", watering_interval: 6,  light: "Halbschatten",     tip: "Hängende Blätter sind ein klares Signal für Wassermangel.", humidity: "Hoch",    difficulty: "Einfach", description: "Elegante Pflanze mit weißen Hochblättern, die die Luft reinigt.", origin: "Tropen Amerikas und Südostasiens" },
+    "Drachenbaum":  { icon: "🎋", watering_interval: 12, light: "Hell, indirekt",   tip: "Braucht wenig Wasser. Braune Spitzen deuten auf zu trockene Luft hin.", humidity: "Mittel",  difficulty: "Einfach", description: "Palmenähnliche Pflanze mit schmalen, spitzen Blättern.", origin: "Tropisches Afrika" },
+    "Bogenhanf":    { icon: "🐍", watering_interval: 25, light: "Wenig bis sonnig",  tip: "Wohl die robusteste Zimmerpflanze. Lieber zu trocken als zu nass.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Nahezu unkaputtbare Pflanze mit aufrecht wachsenden Blättern.", origin: "Westafrika" },
+    "Elefantenfuß": { icon: "🐘", watering_interval: 18, light: "Hell bis sonnig",   tip: "Speichert viel Wasser im Stamm. Staunässe führt schnell zu Fäulnis.", humidity: "Niedrig", difficulty: "Einfach", description: "Charakteristische Pflanze mit verdicktem Stammfuß.", origin: "Mexiko" },
+    "Zamioculcas":  { icon: "🍃", watering_interval: 18, light: "Wenig bis hell",   tip: "Je dunkler sie steht, desto weniger Wasser benötigt sie.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wachsartig glänzende Blätter und extrem pflegeleicht.", origin: "Ostafrika" },
+    "Andere":       { icon: "🌺", watering_interval: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
   };
 
   const C = {
@@ -68,14 +68,14 @@
     return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
   }
   function needsWater(p) {
-    const d = daysSince(p.lastWatered);
+    const d = daysSince(p.last_watered_date);
     if (d === null) return true;
-    return d >= (PLANT_DB[p.type]?.water || 7);
+    return d >= (PLANT_DB[p.type]?.watering_interval || 7);
   }
   function daysUntil(p) {
-    const d = daysSince(p.lastWatered);
+    const d = daysSince(p.last_watered_date);
     if (d === null) return 0;
-    return Math.max(0, (PLANT_DB[p.type]?.water || 7) - d);
+    return Math.max(0, (PLANT_DB[p.type]?.watering_interval || 7) - d);
   }
 
   // ── Label ──────────────────────────────────────────────
@@ -140,7 +140,7 @@
             React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
               thirsty.map(p => {
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
-                const d = daysSince(p.lastWatered);
+                const d = daysSince(p.last_watered_date);
                 return React.createElement('div', {
                   key: p.id,
                   style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: "1px solid #f5d8cc" },
@@ -197,7 +197,7 @@
           React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 } },
             [
               { label: "Pflanzen", value: plants.length, icon: "🪴" },
-              { label: "Heute gegossen", value: plants.filter(p => p.lastWatered && daysSince(p.lastWatered) === 0).length, icon: "💧" }
+              { label: "Heute gegossen", value: plants.filter(p => p.last_watered_date && daysSince(p.last_watered_date) === 0).length, icon: "💧" }
             ].map(s => React.createElement('div', { key: s.label, style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
               React.createElement('span', { style: { fontSize: 22 } }, s.icon),
               React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 28, fontWeight: 600, marginTop: 4 } }, s.value),
@@ -241,7 +241,7 @@
   function PlantDetail({ plant, onBack, onWater, onDelete }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
     const water = needsWater(plant);
-    const days = daysSince(plant.lastWatered);
+    const days = daysSince(plant.last_watered_date);
     const [showDelete, setShowDelete] = useState(false);
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 40 } },
@@ -274,7 +274,7 @@
           React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 } }, "Pflegeinfos"),
           React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
             [
-              { label: "Gießen", value: `Alle ${info.water} Tage`, icon: "💧" },
+              { label: "Gießen", value: `Alle ${info.watering_interval} Tage`, icon: "💧" },
               { label: "Licht", value: info.light, icon: "☀️" },
               { label: "Luftfeuchtigkeit", value: info.humidity, icon: "🌡️" },
               { label: "Schwierigkeit", value: info.difficulty, icon: "⭐" },
@@ -328,7 +328,7 @@
 
     const submit = () => {
       if (!name.trim()) return;
-      onAdd({ id: Date.now().toString(), name: name.trim(), type, notes, lastWatered: alreadyWatered ? new Date().toISOString() : null });
+      onAdd({ id: Date.now().toString(), name: name.trim(), type, notes, last_watered_date: alreadyWatered ? new Date().toISOString() : null });
     };
 
     const inputStyle = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", fontSize: 15, color: C.text, outline: "none", WebkitAppearance: "none" };
@@ -389,20 +389,40 @@
     useEffect(() => {
       try {
         const saved = localStorage.getItem("pflanzenpflege_v1");
-        if (saved) setPlants(JSON.parse(saved));
+        if (saved) {
+          const data = JSON.parse(saved);
+          const migrated = data.map(p => ({
+            ...p,
+            last_watered_date: p.last_watered_date || p.lastWatered || null
+          }));
+          setPlants(migrated);
+        }
       } catch {}
       setLoaded(true);
     }, []);
+
+    // ── Gieß-Erinnerungs-Logik (Notification-Skeleton) ─────
+    useEffect(() => {
+      if (!loaded) return;
+      const thirsty = plants.filter(needsWater);
+      if (thirsty.length > 0) {
+        console.log("🔔 Gieß-Erinnerung:");
+        thirsty.forEach(p => {
+          console.log(\`- \${p.name} (\${p.type}) muss heute gegossen werden!\`);
+        });
+        // Hier könnte eine Integration für Cloud Functions oder Web Push stehen.
+      }
+    }, [loaded, plants]);
 
     const save = useCallback((updated) => {
       setPlants(updated);
       try { localStorage.setItem("pflanzenpflege_v1", JSON.stringify(updated)); } catch {}
     }, []);
 
-    const waterPlant = id => save(plants.map(p => p.id === id ? { ...p, lastWatered: new Date().toISOString() } : p));
+    const waterPlant = id => save(plants.map(p => p.id === id ? { ...p, last_watered_date: new Date().toISOString() } : p));
     const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
 
-    if (!loaded) return React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
+    if (!loaded) return React.createElement('div', { id: 'loading', style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
       React.createElement('span', { style: { fontSize: 48 } }, "🌿")
     );
 
