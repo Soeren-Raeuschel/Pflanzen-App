@@ -7,18 +7,21 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pflanzen" />
-  <meta name="theme-color" content="#F7F5F0" />
+  <meta name="theme-color" id="theme-meta" content="#FAFBFC" />
   <title>Pflanzenpflege</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; background: #F7F5F0; font-family: 'DM Sans', sans-serif; color: #1A1A1A; overscroll-behavior: none; }
-    input, select, textarea, button { font-family: 'DM Sans', sans-serif; }
+    html, body { height: 100%; background: #FAFBFC; font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif; color: #1A1A1A; overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
+    html.dark, body.dark { background: #0F172A; color: #E2E8F0; }
+    input, select, textarea, button { font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif; }
     ::-webkit-scrollbar { display: none; }
     #root { height: 100%; }
     .safe-top { padding-top: env(safe-area-inset-top, 20px); }
     .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+    button { -webkit-appearance: none; }
+    input { -webkit-appearance: none; }
   </style>
 </head>
 <body>
@@ -33,35 +36,199 @@
 
   const PLANT_DB = {
     "Monstera":     { icon: "🌿", watering_interval: 9,  light: "Hell, indirekt",   tip: "Die Erde sollte zwischendurch gut antrocknen. Staunässe unbedingt vermeiden.", humidity: "Hoch",    difficulty: "Einfach", description: "Bekannt für ihre großen, gefensterten Blätter.", origin: "Zentral- und Südamerika" },
-    "Pothos":       { icon: "🍃", watering_interval: 10, light: "Wenig bis indirekt", tip: "Sehr anpassungsfähig. Verzeiht es, wenn das Gießen mal vergessen wird.", humidity: "Mittel",  difficulty: "Sehr einfach", description: "Eine kletternde oder hängende Pflanze mit herzförmigen Blättern.", origin: "Südostasien" },
-    "Ficus":        { icon: "🌳", watering_interval: 7,  light: "Hell, indirekt",   tip: "Reagiert empfindlich auf Standortwechsel und Zugluft.", humidity: "Mittel",  difficulty: "Mittel", description: "Ein beliebter Zimmerbaum mit glänzenden Blättern.", origin: "Südostasien, Australien" },
+    "Pothos":       { icon: "💚", watering_interval: 10, light: "Wenig bis indirekt", tip: "Sehr anpassungsfähig. Verzeiht es, wenn das Gießen mal vergessen wird.", humidity: "Mittel",  difficulty: "Sehr einfach", description: "Eine kletternde oder hängende Pflanze mit herzförmigen Blättern.", origin: "Südostasien" },
+    "Ficus":       { icon: "🌳", watering_interval: 7,  light: "Hell, indirekt",   tip: "Reagiert empfindlich auf Standortwechsel und Zugluft.", humidity: "Mittel",  difficulty: "Mittel", description: "Ein beliebter Zimmerbaum mit glänzenden Blättern.", origin: "Südostasien, Australien" },
     "Kaktus":       { icon: "🌵", watering_interval: 25, light: "Volle Sonne",      tip: "Im Winter fast gar nicht gießen. Benötigt mineralisches Substrat.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wasserspeichernde Pflanze, perfekt für sonnige Plätze.", origin: "Amerika" },
     "Orchidee":     { icon: "🌸", watering_interval: 8,  light: "Hell, indirekt",   tip: "Am besten den Topf für 15 Min. in kalkarmes Wasser tauchen, dann abtropfen lassen.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Elegante Blütenpflanze mit speziellen Pflegeansprüchen.", origin: "Tropen weltweit" },
     "Aloe Vera":    { icon: "🌱", watering_interval: 18, light: "Direkte Sonne",    tip: "Gießen erst wenn das Substrat fast vollständig durchgetrocknet ist.", humidity: "Niedrig", difficulty: "Einfach", description: "Heilpflanze mit dickfleischigen, dornigen Blättern.", origin: "Arabische Halbinsel" },
     "Lavendel":     { icon: "💜", watering_interval: 8,  light: "Volle Sonne",      tip: "Staunässe vermeiden, liebt kalkhaltigen, eher nährstoffarmen Boden.", humidity: "Niedrig", difficulty: "Mittel", description: "Duftende Pflanze mit lila Blüten, liebt die Sonne.", origin: "Mittelmeerraum" },
-    "Basilikum":    { icon: "🫚", watering_interval: 2,  light: "Volle Sonne",      tip: "Braucht täglich Kontrolle. Nie von oben auf die Blätter gießen.", humidity: "Mittel",  difficulty: "Mittel", description: "Beliebtes Küchenkraut für frische Gerichte.", origin: "Tropisches Asien" },
+    "Basilikum":    { icon: "🌿", watering_interval: 2,  light: "Volle Sonne",      tip: "Braucht täglich Kontrolle. Nie von oben auf die Blätter gießen.", humidity: "Mittel",  difficulty: "Mittel", description: "Beliebtes Küchenkraut für frische Gerichte.", origin: "Tropisches Asien" },
     "Palme":        { icon: "🌴", watering_interval: 6,  light: "Hell, indirekt",   tip: "Der Wurzelballen sollte nie ganz austrocknen. Kalkarmes Wasser nutzen.", humidity: "Hoch",    difficulty: "Mittel", description: "Bringt tropisches Flair in jeden Raum.", origin: "Tropen und Subtropen" },
     "Sukkulente":   { icon: "🪴", watering_interval: 20, light: "Direkte Sonne",    tip: "Blätter nicht mit Wasser benetzen, dies kann zu Fäulnis führen.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Pflegeleichte Pflanzen, die Wasser in ihren Blättern speichern.", origin: "Weltweit in trockenen Regionen" },
-    "Efeu":         { icon: "🍀", watering_interval: 7,  light: "Indirekt",         tip: "Mag es kühl. Regelmäßiges Besprühen beugt Spinnmilben vor.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuste Kletterpflanze, die die Luft reinigt.", origin: "Europa, Westasien" },
+    "Efeu":         { icon: "🍃", watering_interval: 7,  light: "Indirekt",         tip: "Mag es kühl. Regelmäßiges Besprühen beugt Spinnmilben vor.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuste Kletterpflanze, die die Luft reinigt.", origin: "Europa, Westasien" },
     "Bonsai":       { icon: "🎋", watering_interval: 3,  light: "Hell, indirekt",   tip: "Durch die kleine Schale ist die Erde sehr schnell trocken. Täglich prüfen.", humidity: "Hoch",    difficulty: "Anspruchsvoll", description: "Die Kunst, Bäume in Miniaturform zu ziehen.", origin: "Ostasien" },
     "Rose":         { icon: "🌹", watering_interval: 5,  light: "Volle Sonne",      tip: "Im Topf ist der Wasserbedarf sehr hoch. Direkt an der Basis gießen.", humidity: "Mittel",  difficulty: "Mittel", description: "Die Königin der Blumen mit wunderschönen Blüten.", origin: "Nördliche Hemisphäre" },
-    "Spuckpalme":   { icon: "🌵", watering_interval: 9,  light: "Hell, indirekt",   tip: "Vorsicht, der Milchsaft ist giftig und kann Hautreizungen verursachen.", humidity: "Mittel",  difficulty: "Einfach", description: "Interessante Pflanze, die ihre Samen meterweit verschießen kann.", origin: "Madagaskar" },
+    "Spuckpalme":   { icon: "🌺", watering_interval: 9,  light: "Hell, indirekt",   tip: "Vorsicht, der Milchsaft ist giftig und kann Hautreizungen verursachen.", humidity: "Mittel",  difficulty: "Einfach", description: "Interessante Pflanze, die ihre Samen meterweit verschießen kann.", origin: "Madagaskar" },
     "Gummibaum":    { icon: "🌳", watering_interval: 8,  light: "Hell, indirekt",   tip: "Große Blätter regelmäßig feucht abwischen, damit sie atmen können.", humidity: "Mittel",  difficulty: "Einfach", description: "Robuster Klassiker mit großen, ledrigen Blättern.", origin: "Indien, Indonesien" },
-    "Thymian":      { icon: "🌿", watering_interval: 9,  light: "Volle Sonne",      tip: "Sehr genügsam. Weniger Wasser fördert die Aromabildung.", humidity: "Niedrig", difficulty: "Einfach", description: "Würziger Bodendecker für sonnige Standorte.", origin: "Mittelmeerraum" },
-    "Minze":        { icon: "🌱", watering_interval: 3,  light: "Halbschatten",     tip: "Wuchert stark, im Topf ideal. Erde immer leicht feucht halten.", humidity: "Mittel",  difficulty: "Einfach", description: "Erfrischendes Kraut, ideal für Tees und Kaltgetränke.", origin: "Weltweit (gemäßigte Zonen)" },
-    "Friedenslilie": { icon: "🤍", watering_interval: 6,  light: "Halbschatten",     tip: "Hängende Blätter sind ein klares Signal für Wassermangel.", humidity: "Hoch",    difficulty: "Einfach", description: "Elegante Pflanze mit weißen Hochblättern, die die Luft reinigt.", origin: "Tropen Amerikas und Südostasiens" },
-    "Drachenbaum":  { icon: "🎋", watering_interval: 12, light: "Hell, indirekt",   tip: "Braucht wenig Wasser. Braune Spitzen deuten auf zu trockene Luft hin.", humidity: "Mittel",  difficulty: "Einfach", description: "Palmenähnliche Pflanze mit schmalen, spitzen Blättern.", origin: "Tropisches Afrika" },
-    "Bogenhanf":    { icon: "🐍", watering_interval: 25, light: "Wenig bis sonnig",  tip: "Wohl die robusteste Zimmerpflanze. Lieber zu trocken als zu nass.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Nahezu unkaputtbare Pflanze mit aufrecht wachsenden Blättern.", origin: "Westafrika" },
+    "Thymian":      { icon: "🌱", watering_interval: 9,  light: "Volle Sonne",      tip: "Sehr genügsam. Weniger Wasser fördert die Aromabildung.", humidity: "Niedrig", difficulty: "Einfach", description: "Würziger Bodendecker für sonnige Standorte.", origin: "Mittelmeerraum" },
+    "Minze":        { icon: "🌿", watering_interval: 3,  light: "Halbschatten",     tip: "Wuchert stark, im Topf ideal. Erde immer leicht feucht halten.", humidity: "Mittel",  difficulty: "Einfach", description: "Erfrischendes Kraut, ideal für Tees und Kaltgetränke.", origin: "Weltweit (gemäßigte Zonen)" },
+    "Friedenslilie": { icon: "百合", watering_interval: 6,  light: "Halbschatten",     tip: "Hängende Blätter sind ein klares Signal für Wassermangel.", humidity: "Hoch",    difficulty: "Einfach", description: "Elegante Pflanze mit weißen Hochblättern, die die Luft reinigt.", origin: "Tropen Amerikas und Südostasiens" },
+    "Drachenbaum":  { icon: "🌿", watering_interval: 12, light: "Hell, indirekt",   tip: "Braucht wenig Wasser. Braune Spitzen deuten auf zu trockene Luft hin.", humidity: "Mittel",  difficulty: "Einfach", description: "Palmenähnliche Pflanze mit schmalen, spitzen Blättern.", origin: "Tropisches Afrika" },
+    "Bogenhanf":    { icon: "🌱", watering_interval: 25, light: "Wenig bis sonnig",  tip: "Wohl die robusteste Zimmerpflanze. Lieber zu trocken als zu nass.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Nahezu unkaputtbare Pflanze mit aufrecht wachsenden Blättern.", origin: "Westafrika" },
     "Elefantenfuß": { icon: "🐘", watering_interval: 18, light: "Hell bis sonnig",   tip: "Speichert viel Wasser im Stamm. Staunässe führt schnell zu Fäulnis.", humidity: "Niedrig", difficulty: "Einfach", description: "Charakteristische Pflanze mit verdicktem Stammfuß.", origin: "Mexiko" },
-    "Zamioculcas":  { icon: "🍃", watering_interval: 18, light: "Wenig bis hell",   tip: "Je dunkler sie steht, desto weniger Wasser benötigt sie.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wachsartig glänzende Blätter und extrem pflegeleicht.", origin: "Ostafrika" },
-    "Andere":       { icon: "🌺", watering_interval: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
+    "Zamioculcas":  { icon: "💚", watering_interval: 18, light: "Wenig bis hell",   tip: "Je dunkler sie steht, desto weniger Wasser benötigt sie.", humidity: "Niedrig", difficulty: "Sehr einfach", description: "Wachsartig glänzende Blätter und extrem pflegeleicht.", origin: "Ostafrika" },
+    "Tomate":       { icon: "🍅", watering_interval: 2,  light: "Volle Sonne",      tip: "Regelmäßig düngen und ausgeizen. Staunässe vermeiden.", humidity: "Mittel",  difficulty: "Mittel", description: "Beliebtes Gemüse mit roten, saftigen Früchten.", origin: "Südamerika" },
+    "Paprika":      { icon: "🫑", watering_interval: 3,  light: "Volle Sonne",      tip: "Braucht Wärme und regelmäßiges Gießen. Dünger nicht vergessen.", humidity: "Mittel",  difficulty: "Mittel", description: "Farbenfrohes Gemüse in diversen Sorten.", origin: "Mittel- und Südamerika" },
+    "Zitrone":      { icon: "🍋", watering_interval: 5,  light: "Volle Sonne",      tip: "Kalkarmes Wasser bevorzugt. Im Winter kühler stellen.", humidity: "Mittel",  difficulty: "Mittel", description: "Zitruspflanze mit sauren Früchten.", origin: "Südasien" },
+    "Olivenbaum":   { icon: "🌿", watering_interval: 14, light: "Volle Sonne",      tip: "Trockenresistent. Nicht überwässern, Staunässe vermeiden.", humidity: "Niedrig", difficulty: "Einfach", description: "Mediterraner Baum mit silbrigen Blättern.", origin: "Mittelmeerraum" },
+    "Filzige":      { icon: "🍃", watering_interval: 7,  light: "Hell, indirekt",   tip: "Luftfeuchtigkeit wichtig. Regelmäßig besprühen.", humidity: "Hoch",  difficulty: "Mittel", description: "Tropische Pflanze mit samtigen Blättern.", origin: "Südamerika" },
+    "Andere":       { icon: "🌱", watering_interval: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
   };
 
-  const C = {
-    bg: "#F7F5F0", card: "#FFFFFF", text: "#1A1A1A", muted: "#8A8A8A",
-    accent: "#3D6B4F", accentLight: "#EAF2ED",
-    warn: "#E07B54", warnLight: "#FDF0EB", border: "#EBEBEB",
+  function getPlantIcon(plantType) {
+    return PLANT_DB[plantType]?.icon || "🌱";
+  }
+
+  const C_LIGHT = {
+    bg: "#FAFBFC", 
+    card: "#FFFFFF", 
+    text: "#1A1A1A", 
+    muted: "#9CA3AF",
+    accent: "#10B981", 
+    accentLight: "#D1FAE5",
+    warn: "#F59E0B", 
+    warnLight: "#FEF3C7", 
+    border: "#E5E7EB",
+    success: "#10B981",
+    info: "#3B82F6",
+    inverse: "#FFFFFF",
+    inputBg: "#F9F9F9",
+    navBg: "#FFFFFF",
+    cardBorder: "1px solid #E5E7EB",
+    warm: "#B77B00",
+    warmLight: "#FEF3E2",
+    warnBorder: "#f5d8cc",
+    danger: "#DC2626",
+    dangerLight: "#FEF2F2",
+    dangerBorder: "#FECACA",
   };
+
+  const C_DARK = {
+    bg: "#0F172A", 
+    card: "#1E293B", 
+    text: "#E2E8F0", 
+    muted: "#94A3B8",
+    accent: "#10B981", 
+    accentLight: "#064E3B",
+    warn: "#F59E0B", 
+    warnLight: "#451A03", 
+    border: "#334155",
+    success: "#10B981",
+    info: "#3B82F6",
+    inverse: "#000000",
+    inputBg: "#334155",
+    navBg: "#1E293B",
+    cardBorder: "1px solid rgba(255,255,255,0.1)",
+    warm: "#D97706",
+    warmLight: "#451A03",
+    warnBorder: "#78350F",
+    danger: "#DC2626",
+    dangerLight: "#450A0A",
+    dangerBorder: "#7F1D1D",
+  };
+
+  const DEFAULT_ROOMS = [
+    { id: "wohnzimmer", name: "Wohnzimmer", icon: "🛋️", temperature: 20, humidity: 50 },
+    { id: "schlafzimmer", name: "Schlafzimmer", icon: "🛏️", temperature: 18, humidity: 45 },
+    { id: "kueche", name: "Küche", icon: "🍳", temperature: 20, humidity: 55 },
+    { id: "balkon", name: "Balkon", icon: "🌇", temperature: null, humidity: null },
+    { id: "garten", name: "Garten", icon: "🌳", temperature: null, humidity: null },
+    { id: "bad", name: "Bad", icon: "🚿", temperature: 22, humidity: 65 },
+  ];
+
+  // Theme Management
+  let C = C_LIGHT;
+  
+  function getTheme() {
+    try { return localStorage.getItem("pflanzen_theme") || "light"; } catch { return "light"; }
+  }
+  
+  function setThemeMode(mode) {
+    C = mode === "dark" ? C_DARK : C_LIGHT;
+    try { localStorage.setItem("pflanzen_theme", mode); } catch {}
+    const meta = document.getElementById('theme-meta');
+    if(meta) meta.setAttribute('content', mode === 'dark' ? '#0F172A' : '#FAFBFC');
+  }
+  
+  function initTheme() {
+    const mode = getTheme();
+    C = mode === "dark" ? C_DARK : C_LIGHT;
+  }
+  initTheme();
+
+  let weatherData = null;
+  
+  async function fetchWeather() {
+    try {
+      const position = await new Promise((resolve, reject) => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        } else {
+          reject(new Error("No geolocation"));
+        }
+      });
+      
+      const lat = Math.max(-90, Math.min(90, position.coords.latitude));
+      const lon = Math.max(-180, Math.min(180, position.coords.longitude));
+      
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.current) {
+          weatherData = {
+            temp: Math.round(data.current.temperature_2m),
+            humidity: Math.round(data.current.relative_humidity_2m),
+            lat: lat,
+            lon: lon,
+            updated: new Date().toISOString()
+          };
+          return weatherData;
+        }
+      }
+    } catch(e) { 
+      try {
+        const response = await fetch("https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,relative_humidity_2m&timezone=auto");
+        if (response.ok) {
+          const data = await response.json();
+          weatherData = {
+            temp: Math.round(data.current.temperature_2m),
+            humidity: Math.round(data.current.relative_humidity_2m),
+            lat: 52.52,
+            lon: 13.41,
+            updated: new Date().toISOString()
+          };
+          return weatherData;
+        }
+      } catch(e2) {}
+    }
+    return null;
+  }
+
+  function analyzeRoomConditions(plant, room) {
+    const issues = [];
+    const plantInfo = PLANT_DB[plant.type] || {};
+    const aiData = plant.aiData || {};
+    
+    if (!room) return issues;
+    
+    if (room.temperature && aiData.temperature) {
+      const tempMatch = aiData.temperature.match(/(\d+)\s*[-–]\s*(\d+)/);
+      if (tempMatch) {
+        const minTemp = parseInt(tempMatch[1]);
+        const maxTemp = parseInt(tempMatch[2]);
+        if (room.temperature < minTemp || room.temperature > maxTemp) {
+          issues.push(`Temperatur ${room.temperature}°C außerhalb Optimalbereich (${aiData.temperature})`);
+        }
+      }
+    }
+    
+    if (room.humidity && aiData.humidity) {
+      const hum = aiData.humidity.toLowerCase();
+      if (hum.includes("hoch") && room.humidity < 60) {
+        issues.push(`Luftfeuchtigkeit zu niedrig (${room.humidity}%). Pflanze braucht hohe Luftfeuchtigkeit.`);
+      } else if (hum.includes("niedrig") && room.humidity > 40) {
+        issues.push(`Luftfeuchtigkeit zu hoch (${room.humidity}%). Pflanze bevorzugt trockene Luft.`);
+      }
+    }
+    
+    if (room.id === "balkon" || room.id === "garten") {
+      if (aiData.light?.includes("indirekt") || aiData.light?.includes("Halbschatten")) {
+        issues.push("Pflanze preferiert indirektes Licht, direkte Sonne am Balkon könnte schaden.");
+      }
+    }
+    
+    return issues;
+  }
 
   function daysSince(d) {
     if (!d) return null;
@@ -70,12 +237,24 @@
   function needsWater(p) {
     const d = daysSince(p.last_watered_date);
     if (d === null) return true;
-    return d >= (PLANT_DB[p.type]?.watering_interval || 7);
+    return d >= (p.watering_interval || PLANT_DB[p.type]?.watering_interval || 7);
   }
   function daysUntil(p) {
     const d = daysSince(p.last_watered_date);
     if (d === null) return 0;
-    return Math.max(0, (PLANT_DB[p.type]?.watering_interval || 7) - d);
+    return Math.max(0, (p.watering_interval || PLANT_DB[p.type]?.watering_interval || 7) - d);
+  }
+  function needsFertilizer(p) {
+    if (!p.fertilizer_interval || p.fertilizer_interval === 0) return false;
+    const d = daysSince(p.last_fertilized_date);
+    if (d === null) return true;
+    return d >= p.fertilizer_interval;
+  }
+  function daysUntilFertilizer(p) {
+    if (!p.fertilizer_interval || p.fertilizer_interval === 0) return null;
+    const d = daysSince(p.last_fertilized_date);
+    if (d === null) return 0;
+    return Math.max(0, p.fertilizer_interval - d);
   }
 
   // ── Label ──────────────────────────────────────────────
@@ -87,23 +266,194 @@
 
   // ── BottomNav ──────────────────────────────────────────
   function BottomNav({ active, onChange, onAdd }) {
-    const tabs = [{ id: "home", icon: "🏠", label: "Heute" }, { id: "plants", icon: "🪴", label: "Pflanzen" }];
+    const tabs = [
+      { id: "home", icon: "🏠", label: "Heute" },
+      { id: "plants", icon: "🪴", label: "Pflanzen" },
+      { id: "discover", icon: "✨", label: "Entdecken" },
+      { id: "rooms", icon: "🚪", label: "Räume" },
+      { id: "settings", icon: "⚙️", label: "Einstellungen" }
+    ];
+    
     return React.createElement('div', {
-      style: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: "rgba(247,245,240,0.95)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-around", padding: `10px 20px calc(10px + env(safe-area-inset-bottom, 0px))`, zIndex: 100 }
+      style: { 
+        position: "fixed", 
+        bottom: 0, 
+        left: "50%", 
+        transform: "translateX(-50%)", 
+        width: "100%", 
+        maxWidth: 430, 
+        background: C.navBg || C.card,
+        boxShadow: "0 -2px 20px rgba(0,0,0,0.1)",
+        borderTop: `1px solid ${C.border}`, 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "space-between", 
+        padding: `8px 16px calc(8px + env(safe-area-inset-bottom, 0px))`, 
+        zIndex: 100 
+      }
     },
-      ...tabs.map(tab =>
-        React.createElement('button', {
-          key: tab.id, onClick: () => onChange(tab.id),
-          style: { background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 20px", opacity: active === tab.id ? 1 : 0.4 }
-        },
-          React.createElement('span', { style: { fontSize: 22 } }, tab.icon),
-          React.createElement('span', { style: { fontSize: 11, fontWeight: 500, color: active === tab.id ? C.accent : C.muted } }, tab.label)
+      React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "space-around" } },
+        ...tabs.map(tab =>
+          React.createElement('button', {
+            key: tab.id, 
+            onClick: () => onChange(tab.id),
+            style: { 
+              background: "none", 
+              border: "none", 
+              cursor: "pointer", 
+              display: "flex", 
+              flexDirection: "column", 
+              alignItems: "center", 
+              gap: 2, 
+              padding: "8px 10px",
+              borderRadius: 12,
+              background: active === tab.id ? C.accentLight : "transparent",
+              transition: "all 0.2s ease",
+              minWidth: 56
+            }
+          },
+            React.createElement('span', { style: { fontSize: 20 } }, tab.icon),
+            React.createElement('span', { 
+              style: { 
+                fontSize: 10, 
+                fontWeight: 500, 
+                color: active === tab.id ? C.accent : C.muted,
+                whiteSpace: "nowrap"
+              }
+            }, tab.label)
+          )
         )
       ),
-      React.createElement('button', {
+      onAdd && React.createElement('button', {
         onClick: onAdd,
-        style: { background: C.accent, border: "none", borderRadius: 16, width: 52, height: 52, fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(61,107,79,0.3)", color: "#fff" }
+        style: { 
+          background: C.accent, 
+          border: "none", 
+          borderRadius: "50%", 
+          width: 48, 
+          height: 48, 
+          fontSize: 24, 
+          cursor: "pointer", 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          boxShadow: "0 4px 12px rgba(61,107,79,0.3)", 
+          color: C.inverse,
+          marginTop: -8
+        }
       }, "＋")
+    );
+  }
+
+  // ── SettingsView ───────────────────────────────────────
+  function SettingsView() {
+    const [apiKeyInput, setApiKeyInput] = useState(getApiKey());
+    const [saved, setSaved] = useState(false);
+    const [theme, setTheme] = useState(getTheme());
+
+    const handleSave = () => {
+      setApiKey(apiKeyInput.trim());
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    };
+
+    const toggleTheme = () => {
+      const newTheme = theme === "light" ? "dark" : "light";
+      setTheme(newTheme);
+      setThemeMode(newTheme);
+      window.location.reload();
+    };
+
+    const inputStyle = { width: "100%", background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", fontSize: 14, color: C.text, outline: "none", WebkitAppearance: "none" };
+
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100, background: C.bg, minHeight: "100vh" } },
+      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8, color: C.text } }, "Einstellungen"),
+      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 32 } }, "Konfiguriere deine App"),
+      
+      // Theme Toggle
+      React.createElement('div', { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" },
+        React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+          React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12 } },
+            React.createElement('span', { fontSize: 24 }, theme === "dark" ? "🌙" : "☀️"),
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 17, fontWeight: 600, color: C.text } }, "Design"),
+              React.createElement('p', { style: { fontSize: 13, color: C.muted } }, theme === "dark" ? "Dunkel aktiv" : "Hell aktiv")
+            )
+          ),
+          React.createElement('button', {
+            onClick: toggleTheme,
+            style: {
+              background: theme === "dark" ? C.accent : C.border,
+              border: "none",
+              borderRadius: 24,
+              width: 56,
+              height: 32,
+              cursor: "pointer",
+              position: "relative",
+              transition: "background 0.2s"
+            }
+          },
+            React.createElement('div', {
+              style: {
+                background: C.inverse,
+                borderRadius: "50%",
+                width: 26,
+                height: 26,
+                position: "absolute",
+                top: 3,
+                left: theme === "dark" ? 27 : 3,
+                transition: "left 0.2s",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+              }
+            })
+          )
+        )
+      ),
+      
+      // API Key section
+      React.createElement('div', { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" },
+        React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16 } },
+          React.createElement('span', { fontSize: 24 }, "🔑"),
+          React.createElement('p', { style: { fontSize: 17, fontWeight: 600, color: C.text } }, "Groq API-Key")
+        ),
+        React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 1.6 } }, "Trage deinen API-Key ein, um automatische Pflanzendaten von der KI zu erhalten."),
+        React.createElement('input', { 
+          value: apiKeyInput, 
+          onChange: e => setApiKeyInput(e.target.value), 
+          placeholder: "gsk_...", 
+          type: "password",
+          style: { ...inputStyle, marginBottom: 16, fontFamily: "monospace", fontSize: 13 }
+        }),
+        React.createElement('button', {
+          onClick: handleSave,
+          style: { 
+            background: saved ? C.accent : C.text, 
+            color: C.inverse, 
+            border: "none", 
+            borderRadius: 12, 
+            padding: "16px 20px", 
+            fontSize: 15, 
+            fontWeight: 500, 
+            cursor: "pointer", 
+            width: "100%",
+            transition: "background 0.2s"
+          }
+        }, saved ? "✓ Gespeichert" : "Speichern")
+      ),
+      
+      // Help section
+      React.createElement('div', { background: C.inputBg, borderRadius: 20, padding: 24, border: `1px solid ${C.border}`, marginTop: 40 },
+        React.createElement('p', { style: { fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 16 } }, "📋 Anleitung"),
+        React.createElement('ol', { style: { fontSize: 14, color: C.muted, paddingLeft: 20, lineHeight: 2, margin: 0 } },
+          React.createElement('li', { marginBottom: 8 }, "Kostenlosen API-Key unter ", React.createElement('a', { href: "https://console.groq.com", target: "_blank", style: { color: C.accent, textDecoration: "none" } }, "console.groq.com"), " holen"),
+          React.createElement('li', { marginBottom: 8 }, "Key hier eintragen und speichern"),
+          React.createElement('li', { marginBottom: 8 }, "Bei 'Neue Pflanze' Namen eingeben"),
+          React.createElement('li', null, "KI generiert automatisch Pflegeinfos")
+        )
+      ),
+      
+      // Version
+      React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 32 } }, "Pflanzenpflege v2.0")
     );
   }
 
@@ -115,8 +465,313 @@
       React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 28 } }, "Füge deine erste Pflanze hinzu!"),
       React.createElement('button', {
         onClick: onAdd,
-        style: { background: C.accent, color: "#fff", border: "none", borderRadius: 14, padding: "14px 28px", fontSize: 15, fontWeight: 500, cursor: "pointer" }
+        style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 14, padding: "14px 28px", fontSize: 15, fontWeight: 500, cursor: "pointer" }
       }, "Pflanze hinzufügen")
+    );
+  }
+
+  // ── RoomView ───────────────────────────────────────────
+  function RoomView({ rooms, plants, weather, onEditRoom, onSelectPlant, onAddRoom }) {
+    const [newRoomName, setNewRoomName] = React.useState("");
+    const [editingRoom, setEditingRoom] = React.useState(null);
+    const [editForm, setEditForm] = React.useState({});
+
+    const handleAddRoom = () => {
+      if (!newRoomName.trim()) return;
+      onAddRoom({ id: Date.now().toString(), name: newRoomName.trim(), icon: "🏠", temperature: null, humidity: null });
+      setNewRoomName("");
+    };
+
+    const saveRoomEdit = (roomId) => {
+      onEditRoom(roomId, editForm);
+      setEditingRoom(null);
+    };
+
+    const roomPlants = (roomId) => plants.filter(p => p.room_id === roomId);
+
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100 } },
+      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8 } }, "Räume"),
+      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Pflanzen nach Räumen organisieren"),
+      
+      // Weather info
+      weather && React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, border: `1px solid ${C.accent}` } },
+        React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.accent, marginBottom: 8 } }, "🌤️ Außenklima (Live)"),
+        React.createElement('div', { style: { display: "flex", gap: 20 } },
+          React.createElement('div', null,
+            React.createElement('span', { fontSize: 24 }, "🌡️"),
+            React.createElement('p', { style: { fontSize: 20, fontWeight: 600, color: C.text } }, `${weather?.temp}°C`),
+            React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Außentemperatur")
+          ),
+          React.createElement('div', null,
+            React.createElement('span', { fontSize: 24 }, "💧"),
+            React.createElement('p', { style: { fontSize: 20, fontWeight: 600, color: C.text } }, `${weather?.humidity}%`),
+            React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Luftfeuchtigkeit")
+          )
+        )
+      ),
+      
+      // Room list
+      React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
+        rooms.map(room => {
+          const rPlants = roomPlants(room.id);
+          const isEditing = editingRoom === room.id;
+          
+          return React.createElement('div', { key: room.id, style: { background: C.card, borderRadius: 20, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" } },
+            isEditing ?
+              React.createElement('div', null,
+                React.createElement('div', { style: { marginBottom: 16 } },
+                  React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Raumname"),
+                  React.createElement('input', { 
+                    value: editForm.name || "", 
+                    onChange: e => setEditForm({...editForm, name: e.target.value}),
+                    style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }
+                  })
+                ),
+                React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 } },
+                  React.createElement('div', null,
+                    React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Temperatur (°C)"),
+                    React.createElement('input', { 
+                      type: "number", 
+                      value: editForm.temperature ?? "", 
+                      onChange: e => setEditForm({...editForm, temperature: e.target.value ? parseInt(e.target.value) : null}),
+                      placeholder: "z.B. 20",
+                      style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }
+                    })
+                  ),
+                  React.createElement('div', null,
+                    React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Luftfeuchtigkeit (%)"),
+                    React.createElement('input', { 
+                      type: "number", 
+                      value: editForm.humidity ?? "", 
+                      onChange: e => setEditForm({...editForm, humidity: e.target.value ? parseInt(e.target.value) : null}),
+                      placeholder: "z.B. 50",
+                      style: { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }
+                    })
+                  )
+                ),
+                React.createElement('div', { style: { display: "flex", gap: 10 } },
+                  React.createElement('button', { onClick: () => setEditingRoom(null), style: { flex: 1, padding: "12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, cursor: "pointer" } }, "Abbrechen"),
+                  React.createElement('button', { onClick: () => saveRoomEdit(room.id), style: { flex: 1, padding: "12px", borderRadius: 10, border: "none", background: C.accent, color: C.inverse, cursor: "pointer" } }, "Speichern")
+                )
+              ) :
+              React.createElement('div', null,
+                React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
+                  React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12 } },
+                    React.createElement('span', { fontSize: 28 }, room.icon),
+                    React.createElement('div', null,
+                      React.createElement('p', { style: { fontSize: 16, fontWeight: 600 } }, room.name),
+                      React.createElement('p', { style: { fontSize: 12, color: C.muted } }, `${rPlants.length} Pflanz${rPlants.length === 1 ? "e" : "en"}`)
+                    )
+                  ),
+                  React.createElement('button', { onClick: () => { setEditingRoom(room.id); setEditForm({name: room.name, temperature: room.temperature, humidity: room.humidity, icon: room.icon}); }, style: { background: "none", border: "none", fontSize: 20, cursor: "pointer" } }, "⚙️")
+                ),
+                // Room climate
+                (room.temperature || room.humidity) && React.createElement('div', { style: { display: "flex", gap: 12, marginBottom: 12, padding: "12px", background: C.inputBg, borderRadius: 12 } },
+                  room.temperature && React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted } }, "Innentemperatur"),
+                    React.createElement('p', { style: { fontSize: 14, fontWeight: 500 } }, `${room.temperature}°C`)
+                  ),
+                  room.humidity && React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted } }, "Luftfeuchtigkeit"),
+                    React.createElement('p', { style: { fontSize: 14, fontWeight: 500 } }, `${room.humidity}%`)
+                  )
+                ),
+                // Room plants
+                rPlants.length > 0 ? 
+                  React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 8 }, key: p.id },
+                    rPlants.map(p => {
+                      const issues = analyzeRoomConditions(p, room);
+                      return React.createElement('div', { 
+                        key: p.id, 
+                        onClick: () => onSelectPlant(p.id),
+                        style: { 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: 10, 
+                          padding: "10px 12px", 
+                          background: issues.length > 0 ? C.warnLight : C.bg, 
+                          borderRadius: 12,
+                          cursor: "pointer"
+                        }
+                      },
+                        React.createElement('span', { fontSize: 20 }, PLANT_DB[p.type]?.icon || "🌱"),
+                        React.createElement('div', { flex: 1 },
+                          React.createElement('p', { fontSize: 13, fontWeight: 500 }, p.name),
+                          issues.length > 0 && React.createElement('p', { fontSize: 11, color: C.warn }, issues[0])
+                        )
+                      );
+                    })
+                  ) :
+                  React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", padding: "12px" } }, "Keine Pflanzen in diesem Raum")
+              )
+          );
+        })
+      ),
+      
+      // Add new room
+      React.createElement('div', { style: { marginTop: 20, display: "flex", gap: 10 } },
+        React.createElement('input', { 
+          value: newRoomName, 
+          onChange: e => setNewRoomName(e.target.value), 
+          placeholder: "Neuer Raum...",
+          style: { flex: 1, padding: "14px 16px", borderRadius: 14, border: `1px solid ${C.border}`, fontSize: 14 }
+        }),
+        React.createElement('button', { 
+          onClick: handleAddRoom, 
+          disabled: !newRoomName.trim(),
+          style: { background: newRoomName.trim() ? C.accent : C.border, color: C.inverse, border: "none", borderRadius: 14, padding: "14px 20px", fontSize: 14, cursor: newRoomName.trim() ? "pointer" : "default" }
+        }, "+")
+      )
+    )
+  }
+
+  // ── DiscoverView ─────────────────────────────────────────
+  function DiscoverView() {
+    const categories = [
+      { id: "sun", icon: "🌞", label: "Viel Sonne (Outdoor)", prompt: "Pflanzen die viel direktes Sonnenlicht brauchen und für den Garten oder Balkon geeignet sind" },
+      { id: "sleep", icon: "🌙", label: "Schlafqualität", prompt: "Pflanzen die die Schlafqualität verbessern und beruhigend wirken" },
+      { id: "easy", icon: "🌱", label: "Pflegeleicht", prompt: "Sehr pflegeleichte Zimmerpflanzen für Anfänger" },
+      { id: "air", icon: "🌬️", label: "Luftreinigend", prompt: "Pflanzen die die Luftqualität verbessern und Schadstoffe filtern" },
+    ];
+    
+    const [activeCategory, setActiveCategory] = useState(null);
+    const [recommendations, setRecommendations] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    const fetchRecommendations = async (category) => {
+      if (activeCategory === category && recommendations) {
+        setActiveCategory(null);
+        setRecommendations(null);
+        return;
+      }
+      
+      setActiveCategory(category);
+      setLoading(true);
+      
+      try {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          setRecommendations({ error: "Kein API-Key konfiguriert. Bitte in Einstellungen eintragen." });
+          setLoading(false);
+          return;
+        }
+        
+        const cat = categories.find(c => c.id === category);
+        const safePrompt = sanitizeInput(cat.prompt);
+        const prompt = `Gib mir 5-6 Empfehlungen für ${safePrompt}. Antworte als JSON-Array mit diesem Format:
+[
+  { "name": "Pflanzenname", "reason": "Kurze Begründung warum diese Pflanze", "care": "Pflegetipp" }
+]
+Nur JSON, keine Erklärungen.`;
+        
+        let response;
+        try {
+          response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: "llama-3.1-8b-instant",
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.3,
+              max_tokens: 800
+            })
+          }, 15000);
+        } catch (e) {
+          if (e.name === 'AbortError') {
+            setRecommendations({ error: "Zeitüberschreitung. Bitte erneut versuchen." });
+            setLoading(false);
+            return;
+          }
+          throw e;
+        }
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.choices || !data.choices[0]) {
+            setRecommendations({ error: "Ungültige Antwort vom Server" });
+          } else {
+            const content = data.choices[0].message.content;
+            const jsonMatch = content.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              try {
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setRecommendations(parsed);
+                } else {
+                  setRecommendations({ error: "Keine Ergebnisse gefunden" });
+                }
+              } catch(parseErr) {
+                setRecommendations({ error: "Fehler beim Verarbeiten der Antwort" });
+              }
+            } else {
+              setRecommendations({ error: "Keine Ergebnisse gefunden" });
+            }
+          }
+        } else {
+          setRecommendations({ error: `Server-Fehler (${response.status})` });
+        }
+      } catch (e) {
+        setRecommendations({ error: "Verbindungsfehler. Bitte erneut versuchen." });
+      }
+      
+      setLoading(false);
+    };
+
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100 } },
+      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8 } }, "Entdecken"),
+      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Finde die perfekte Pflanze für dich"),
+      
+      // Categories
+      React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 } },
+        categories.map(cat =>
+          React.createElement('div', {
+            key: cat.id,
+            onClick: () => fetchRecommendations(cat.id),
+            style: {
+              background: activeCategory === cat.id ? C.accent : C.card,
+              border: `1px solid ${activeCategory === cat.id ? C.accent : C.border}`,
+              borderRadius: 16,
+              padding: 20,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              boxShadow: activeCategory === cat.id ? `0 4px 12px ${C.accent}40` : "0 2px 8px rgba(0,0,0,0.04)"
+            }
+          },
+            React.createElement('span', { style: { fontSize: 28, display: "block", marginBottom: 8 } }, cat.icon),
+            React.createElement('p', { style: { fontSize: 14, fontWeight: 500, color: activeCategory === cat.id ? C.inverse : C.text } }, cat.label)
+          )
+        )
+      ),
+      
+      // Results
+      loading && React.createElement('div', { style: { textAlign: "center", padding: 40 } },
+        React.createElement('span', { fontSize: 32 }, "⏳"),
+        React.createElement('p', { style: { fontSize: 14, color: C.muted, marginTop: 12 } }, "Lade Empfehlungen...")
+      ),
+      
+      recommendations && !recommendations.error && React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
+        React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 } }, "Empfehlungen"),
+        recommendations.map((rec, i) =>
+          React.createElement('div', {
+            key: i,
+            style: { background: C.card, borderRadius: 16, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }
+          },
+            React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 8 } },
+              React.createElement('span', { fontSize: 24 }, "🌿"),
+              React.createElement('p', { fontSize: 16, fontWeight: 600 }, rec.name)
+            ),
+            rec.reason && React.createElement('p', { style: { fontSize: 13, color: C.muted, marginBottom: 6 } }, rec.reason),
+            rec.care && React.createElement('p', { style: { fontSize: 12, color: C.accent, background: C.accentLight, padding: "8px 12px", borderRadius: 8 } }, "💡 " + rec.care)
+          )
+        )
+      ),
+      
+      recommendations && recommendations.error && React.createElement('div', { style: { background: C.warnLight, borderRadius: 16, padding: 20, border: `1px solid ${C.warnBorder}` } },
+        React.createElement('p', { style: { color: C.warn, fontSize: 14 } }, recommendations.error)
+      )
     );
   }
 
@@ -143,7 +798,7 @@
                 const d = daysSince(p.last_watered_date);
                 return React.createElement('div', {
                   key: p.id,
-                  style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: "1px solid #f5d8cc" },
+                  style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.warnBorder}` },
                   onClick: () => onSelect(p.id)
                 },
                   React.createElement('span', { style: { fontSize: 30 } }, info.icon),
@@ -153,7 +808,7 @@
                   ),
                   React.createElement('button', {
                     onClick: e => { e.stopPropagation(); onWater(p.id); },
-                    style: { background: C.warn, color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }
+                    style: { background: C.warn, color: C.inverse, border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }
                   }, "💧 Gießen")
                 );
               })
@@ -203,6 +858,30 @@
               React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 28, fontWeight: 600, marginTop: 4 } }, s.value),
               React.createElement('p', { style: { fontSize: 12, color: C.muted } }, s.label)
             ))
+          ),
+          // Fertilizer section
+          plants.filter(p => p.fertilizer_interval > 0).length > 0 && React.createElement('div', { style: { marginTop: 24 } },
+            React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.warm, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "🧪 Düngen fällig"),
+            React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
+              plants.filter(p => p.fertilizer_interval > 0 && needsFertilizer(p)).map(p => {
+                const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
+                return React.createElement('div', {
+                  key: p.id,
+                  style: { background: C.warmLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.warm}40` },
+                  onClick: () => onSelect(p.id)
+                },
+                  React.createElement('span', { style: { fontSize: 28 } }, info.icon),
+                  React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15, color: C.warm } }, p.name),
+                    React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.fertilizer_type || `Alle ${p.fertilizer_interval} Tage`)
+                  ),
+                  React.createElement('span', { style: { fontSize: 12, color: C.warm, background: C.warmLight, padding: "4px 10px", borderRadius: 8, fontWeight: 500 } }, "Jetzt")
+                );
+              }),
+              plants.filter(p => p.fertilizer_interval > 0 && !needsFertilizer(p)).length > 0 && React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "14px 16px", border: `1px solid ${C.border}` } },
+                React.createElement('p', { style: { fontSize: 13, color: C.muted } }, `${plants.filter(p => p.fertilizer_interval > 0 && !needsFertilizer(p)).length} Pflanz${plants.filter(p => p.fertilizer_interval > 0 && !needsFertilizer(p)).length === 1 ? "e" : "en"} in den nächsten Tagen düngen`)
+              )
+            )
           )
         )
     );
@@ -213,7 +892,7 @@
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
       React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 } },
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Meine Pflanzen"),
-        React.createElement('button', { onClick: onAdd, style: { background: C.accent, color: "#fff", border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Neu")
+        React.createElement('button', { onClick: onAdd, style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Neu")
       ),
       plants.length === 0 ? React.createElement(EmptyState, { onAdd }) :
         React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
@@ -222,7 +901,7 @@
             const water = needsWater(p);
             return React.createElement('div', {
               key: p.id, onClick: () => onSelect(p.id),
-              style: { background: C.card, borderRadius: 20, padding: "18px 16px", cursor: "pointer", border: `1px solid ${water ? "#f5d8cc" : C.border}`, position: "relative" }
+              style: { background: C.card, borderRadius: 20, padding: "18px 16px", cursor: "pointer", border: `1px solid ${water ? C.warnBorder : C.border}`, position: "relative" }
             },
               water && React.createElement('div', { style: { position: "absolute", top: 10, right: 10, width: 8, height: 8, borderRadius: 4, background: C.warn } }),
               React.createElement('span', { style: { fontSize: 36, display: "block", marginBottom: 10 } }, info.icon),
@@ -238,11 +917,13 @@
   }
 
   // ── PlantDetail ────────────────────────────────────────
-  function PlantDetail({ plant, onBack, onWater, onDelete }) {
+  function PlantDetail({ plant, onBack, onWater, onFertilize, onDelete }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
     const water = needsWater(plant);
     const days = daysSince(plant.last_watered_date);
     const [showDelete, setShowDelete] = useState(false);
+
+    const hasAiData = plant.aiData && Object.keys(plant.aiData).length > 0;
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 40 } },
       // Header
@@ -255,22 +936,71 @@
       React.createElement('div', { style: { padding: "24px 20px" } },
         // Water status
         water ?
-          React.createElement('div', { style: { background: C.warnLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #f5d8cc" } },
+          React.createElement('div', { style: { background: C.warnLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.warnBorder}` } },
             React.createElement('div', null,
               React.createElement('p', { style: { fontWeight: 500, color: C.warn } }, "Gießen fällig!"),
               React.createElement('p', { style: { fontSize: 13, color: C.muted } }, days === null ? "Noch nie gegossen" : `Vor ${days} Tag${days !== 1 ? "en" : ""} gegossen`)
             ),
-            React.createElement('button', { onClick: () => onWater(plant.id), style: { background: C.warn, color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Jetzt")
+            React.createElement('button', { onClick: () => onWater(plant.id), style: { background: C.warn, color: C.inverse, border: "none", borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Jetzt")
           ) :
           React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" } },
             React.createElement('div', null,
-              React.createElement('p', { style: { fontWeight: 500, color: C.accent } }, `Nächstes Gießen in ${daysUntil(plant)} Tag${daysUntil(plant) !== 1 ? "en" : ""}`),
+              React.createElement('p', { style: { fontWeight: 500, color: C.accent } }, `Nächstes Gießen in ${plant.watering_interval || daysUntil(plant)} Tag${(plant.watering_interval || daysUntil(plant)) !== 1 ? "en" : ""}`),
               React.createElement('p', { style: { fontSize: 13, color: C.muted } }, days === 0 ? "Heute gegossen ✓" : `Vor ${days} Tag${days !== 1 ? "en" : ""} gegossen`)
             ),
             React.createElement('button', { onClick: () => onWater(plant.id), style: { background: "none", color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Gießen")
           ),
-        // Care info grid
-        React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+        // Fertilizer status
+        plant.fertilizer_interval > 0 && React.createElement('div', { style: { marginBottom: 20 } },
+          needsFertilizer(plant) ?
+            React.createElement('div', { style: { background: C.warmLight, borderRadius: 16, padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.warm}40` } },
+              React.createElement('div', null,
+                React.createElement('p', { style: { fontWeight: 500, color: C.warm } }, "Düngen fällig!"),
+                React.createElement('p', { style: { fontSize: 13, color: C.muted } }, plant.fertilizer_type ? `Art: ${plant.fertilizer_type}` : "Zeit für Dünger")
+              ),
+              React.createElement('button', { onClick: () => onFertilize(plant.id), style: { background: C.warm, color: C.inverse, border: "none", borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "🧪 Jetzt")
+            ) :
+            React.createElement('div', { style: { background: C.bg, borderRadius: 16, padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" } },
+              React.createElement('div', null,
+                React.createElement('p', { style: { fontWeight: 500, color: C.text } }, `Nächstes Düngen in ${daysUntilFertilizer(plant)} Tag${daysUntilFertilizer(plant) !== 1 ? "en" : ""}`),
+                React.createElement('p', { style: { fontSize: 13, color: C.muted } }, plant.fertilizer_type ? `Art: ${plant.fertilizer_type}` : `Alle ${plant.fertilizer_interval} Tage`)
+              ),
+              React.createElement('button', { onClick: () => onFertilize(plant.id), style: { background: "none", color: C.warm, border: `1.5px solid ${C.warm}`, borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "🧪 Düngen")
+            )
+        ),
+        // AI-generated care info (priority)
+        hasAiData && React.createElement('div', { style: { background: C.accentLight, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1.5px solid ${C.accent}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.accent, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16, display: "flex", alignItems: "center", gap: 6 } }, "🤖 KI-Pflegeinfos"),
+          React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
+            plant.aiData.light && React.createElement('div', { style: { background: C.card, borderRadius: 12, padding: "12px" } },
+              React.createElement('span', { style: { fontSize: 18 } }, "☀️"),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, "Licht"),
+              React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, plant.aiData.light)
+            ),
+            plant.aiData.water && React.createElement('div', { style: { background: C.card, borderRadius: 12, padding: "12px" } },
+              React.createElement('span', { style: { fontSize: 18 } }, "💧"),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, "Gießen"),
+              React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, plant.aiData.water)
+            ),
+            plant.aiData.humidity && React.createElement('div', { style: { background: C.card, borderRadius: 12, padding: "12px" } },
+              React.createElement('span', { style: { fontSize: 18 } }, "🌡️"),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, "Luftfeuchtigkeit"),
+              React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, plant.aiData.humidity)
+            ),
+            plant.aiData.temperature && React.createElement('div', { style: { background: C.card, borderRadius: 12, padding: "12px" } },
+              React.createElement('span', { style: { fontSize: 18 } }, "🌡️"),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, "Temperatur"),
+              React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, plant.aiData.temperature)
+            ),
+            plant.aiData.fertilizer && React.createElement('div', { style: { background: C.card, borderRadius: 12, padding: "12px", gridColumn: "span 2" } },
+              React.createElement('span', { style: { fontSize: 18 } }, "🧪"),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, "Dünger"),
+              React.createElement('p', { style: { fontSize: 13, fontWeight: 500, marginTop: 2 } }, plant.aiData.fertilizer)
+            )
+          )
+        ),
+        // Default care info grid (fallback)
+        !hasAiData && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
           React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 } }, "Pflegeinfos"),
           React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
             [
@@ -307,29 +1037,226 @@
         ),
         // Delete
         !showDelete ?
-          React.createElement('button', { onClick: () => setShowDelete(true), style: { width: "100%", background: "none", border: "1px solid #FFCDD2", color: "#E53935", borderRadius: 14, padding: "14px", fontSize: 14, cursor: "pointer", marginTop: 8 } }, "Pflanze entfernen") :
-          React.createElement('div', { style: { background: "#FFF5F5", borderRadius: 14, padding: "16px", border: "1px solid #FFCDD2", marginTop: 8 } },
+          React.createElement('button', { onClick: () => setShowDelete(true), style: { width: "100%", background: "none", border: `1px solid ${C.dangerBorder}`, color: C.danger, borderRadius: 14, padding: "14px", fontSize: 14, cursor: "pointer", marginTop: 8 } }, "Pflanze entfernen") :
+          React.createElement('div', { style: { background: C.dangerLight, borderRadius: 14, padding: "16px", border: `1px solid ${C.dangerBorder}`, marginTop: 8 } },
             React.createElement('p', { style: { fontSize: 14, marginBottom: 12, textAlign: "center" } }, "Wirklich löschen?"),
             React.createElement('div', { style: { display: "flex", gap: 10 } },
               React.createElement('button', { onClick: () => setShowDelete(false), style: { flex: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px", cursor: "pointer", fontSize: 14 } }, "Abbrechen"),
-              React.createElement('button', { onClick: () => onDelete(plant.id), style: { flex: 1, background: "#E53935", color: "#fff", border: "none", borderRadius: 10, padding: "12px", cursor: "pointer", fontSize: 14 } }, "Löschen")
+              React.createElement('button', { onClick: () => onDelete(plant.id), style: { flex: 1, background: C.danger, color: C.inverse, border: "none", borderRadius: 10, padding: "12px", cursor: "pointer", fontSize: 14 } }, "Löschen")
             )
           )
       )
     );
   }
 
+  const GROQ_MODEL = "llama-3.1-8b-instant";
+  const STORAGE_KEY_API = "pflanzen_groq_api_key";
+  
+  function getApiKey() {
+    try { return localStorage.getItem(STORAGE_KEY_API) || ""; } catch { return ""; }
+  }
+  function setApiKey(key) {
+    try { localStorage.setItem(STORAGE_KEY_API, key); } catch {}
+  }
+
+  const plantCache = {};
+
+  // Input Sanitization - verhindert XSS und Injection
+  function sanitizeInput(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/[<>]/g, '') // Entferne HTML-Tags
+      .replace(/[\u0000-\u001F\u007F]/g, '') // Entferne Kontrollzeichen
+      .trim()
+      .slice(0, 200); // Maximale Länge
+  }
+
+  // Timeout-Wrapper für API-Calls
+  function fetchWithTimeout(url, options, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { ...options, signal: controller.signal })
+      .finally(() => clearTimeout(timeout));
+  }
+
+  async function fetchPlantData(plantName) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error("Kein API-Key konfiguriert. Bitte in Settings eintragen.");
+    }
+    
+    // Input validieren und sanitieren
+    const safeName = sanitizeInput(plantName);
+    if (!safeName || safeName.length < 2) {
+      throw new Error("Ungültiger Pflanzenname.");
+    }
+    
+    if (plantCache[safeName.toLowerCase()]) {
+      return plantCache[safeName.toLowerCase()];
+    }
+
+    const month = new Date().getMonth() + 1;
+    const season = month >= 3 && month <= 5 ? "Frühling" : month >= 6 && month <= 8 ? "Sommer" : month >= 9 && month <= 11 ? "Herbst" : "Winter";
+
+    const prompt = `Du bist ein Pflanzenexperte. Gib Informationen für die Pflanze "${safeName}" als JSON zurück. Berücksichtige aktuell ist ${season}. Antworte NUR mit diesem exakten Format:
+
+{
+  "name": "Pflanzenname",
+  "light": "Lichtbedarf",
+  "water": "Gießverhalten mit Intervall in Tagen",
+  "humidity": "optimale Luftfeuchtigkeit",
+  "temperature": "Temperaturbereich",
+  "fertilizer_interval": 14,
+  "fertilizer_type": "Düngerart und saisonale Anpassung",
+  "notes": "zusätzliche Hinweise zur Pflege inkl. jahreszeitlicher Tipps"
+}
+
+Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval muss eine Zahl sein (Tage).`;
+
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3,
+            max_tokens: 500
+          })
+        }, 15000);
+
+        if (response.status === 429) {
+          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`API-Fehler: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.choices || !data.choices[0]) {
+          throw new Error("Ungültige API-Antwort");
+        }
+        
+        const content = data.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          // Validierung der geparsten Daten
+          if (!parsed.name || !parsed.water) {
+            throw new Error("Unvollständige Pflanzendaten");
+          }
+          plantCache[safeName.toLowerCase()] = parsed;
+          return parsed;
+        }
+        throw new Error("Keine gültigen Daten gefunden");
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          throw new Error("Zeitüberschreitung. Bitte erneut versuchen.");
+        }
+        if (attempt === maxRetries - 1) throw e;
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+
   // ── AddPlant ───────────────────────────────────────────
-  function AddPlant({ onAdd, onBack }) {
+  function AddPlant({ onAdd, onBack, existingPlants = [], rooms = [] }) {
     const [name, setName] = useState("");
     const [type, setType] = useState("Monstera");
     const [notes, setNotes] = useState("");
     const [alreadyWatered, setAlreadyWatered] = useState(true);
+    const [fertilizerEnabled, setFertilizerEnabled] = useState(false);
+    const [fertilizerInterval, setFertilizerInterval] = useState(14);
+    const [fertilizerType, setFertilizerType] = useState("");
+    const [roomId, setRoomId] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-    const submit = () => {
+    const submit = async () => {
       if (!name.trim()) return;
-      onAdd({ id: Date.now().toString(), name: name.trim(), type, notes, last_watered_date: alreadyWatered ? new Date().toISOString() : null });
+      setError(null);
+
+      const normalizedName = name.trim().toLowerCase();
+      const exists = existingPlants.some(p => 
+        p.name.toLowerCase().includes(normalizedName) || 
+        normalizedName.includes(p.name.toLowerCase())
+      );
+
+      if (exists) {
+        setError("Diese Pflanze existiert bereits!");
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const aiData = await fetchPlantData(name.trim());
+        
+        const wateringInterval = parseInt(aiData.water?.match(/\d+/)?.[0] || "7");
+        const aiFertilizerInterval = parseInt(aiData.fertilizer_interval) || 0;
+        
+        const newPlant = {
+          id: Date.now().toString(),
+          name: aiData.name || name.trim(),
+          type: findMatchingType(aiData.name || name.trim()),
+          notes: notes,
+          last_watered_date: alreadyWatered ? new Date().toISOString() : null,
+          aiData: {
+            light: aiData.light,
+            water: aiData.water,
+            humidity: aiData.humidity,
+            temperature: aiData.temperature,
+            fertilizer: aiData.fertilizer_type || aiData.fertilizer,
+            notes: aiData.notes || ""
+          },
+          watering_interval: wateringInterval,
+          fertilizer_interval: fertilizerEnabled ? fertilizerInterval : (aiFertilizerInterval > 0 ? aiFertilizerInterval : 0),
+          fertilizer_type: fertilizerEnabled ? fertilizerType : (aiData.fertilizer_type || aiData.fertilizer || ""),
+          last_fertilized_date: (fertilizerEnabled || aiFertilizerInterval > 0) ? new Date().toISOString() : null,
+          room_id: roomId || null
+        };
+        onAdd(newPlant);
+      } catch (e) {
+        const errorMessage = e.message.includes('Zeitüberschreitung') || e.message.includes('timeout') 
+          ? "Zeitüberschreitung. Bitte erneut versuchen." 
+          : "Fehler: " + e.message;
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
+    const addManually = () => {
+      if (!name.trim()) return;
+      const newPlant = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        type: type,
+        notes: notes,
+        last_watered_date: alreadyWatered ? new Date().toISOString() : null,
+        watering_interval: PLANT_DB[type]?.watering_interval || 7,
+        fertilizer_interval: fertilizerEnabled ? fertilizerInterval : 0,
+        fertilizer_type: fertilizerEnabled ? fertilizerType : "",
+        last_fertilized_date: fertilizerEnabled ? new Date().toISOString() : null,
+        room_id: roomId || null
+      };
+      onAdd(newPlant);
+    };
+
+    function findMatchingType(plantName) {
+      const lower = plantName.toLowerCase();
+      for (const [key, val] of Object.entries(PLANT_DB)) {
+        if (lower.includes(key.toLowerCase())) return key;
+      }
+      return "Andere";
+    }
 
     const inputStyle = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", fontSize: 15, color: C.text, outline: "none", WebkitAppearance: "none" };
 
@@ -339,14 +1266,25 @@
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Neue Pflanze")
       ),
       React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 } },
-        // Name
+        // Name with AI indicator
         React.createElement('div', null,
           React.createElement(Label, null, "Name der Pflanze"),
-          React.createElement('input', { value: name, onChange: e => setName(e.target.value), placeholder: "z.B. Meine Monstera", style: inputStyle })
+          React.createElement('input', { 
+            value: name, 
+            onChange: e => setName(e.target.value), 
+            placeholder: "z.B. Monstera, Ficus, Basilikum", 
+            style: inputStyle 
+          })
         ),
+        // AI hint
+        React.createElement('div', { style: { fontSize: 12, color: C.muted, background: C.accentLight, padding: "10px 14px", borderRadius: 10 } },
+          "🤖 Gib den Pflanzennamen ein und klicke auf 'Pflanze hinzufügen' für automatische KI-Pflegeinfos"
+        ),
+        // Error message
+        error && React.createElement('div', { style: { background: C.warnLight, border: `1px solid ${C.warnBorder}`, borderRadius: 12, padding: "12px 14px", color: C.warn, fontSize: 13 } }, error),
         // Type grid
         React.createElement('div', null,
-          React.createElement(Label, null, "Pflanzenart"),
+          React.createElement(Label, null, "Pflanzenart (alternativ manuell wählen)"),
           React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
             Object.entries(PLANT_DB).map(([key, val]) =>
               React.createElement('button', {
@@ -369,11 +1307,84 @@
           React.createElement('input', { type: "checkbox", id: "watered", checked: alreadyWatered, onChange: e => setAlreadyWatered(e.target.checked), style: { width: 18, height: 18, accentColor: C.accent, cursor: "pointer" } }),
           React.createElement('label', { htmlFor: "watered", style: { fontSize: 14, cursor: "pointer" } }, "Heute schon gegossen?")
         ),
-        // Submit
-        React.createElement('button', {
-          onClick: submit, disabled: !name.trim(),
-          style: { background: name.trim() ? C.accent : C.border, color: "#fff", border: "none", borderRadius: 16, padding: "16px", fontSize: 16, fontWeight: 500, cursor: name.trim() ? "pointer" : "default" }
-        }, "Pflanze hinzufügen 🌿")
+        // Fertilizer section
+        React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+          React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
+            React.createElement('p', { style: { fontSize: 14, fontWeight: 500 } }, "🧪 Düngeprogramm"),
+            React.createElement('input', { type: "checkbox", checked: fertilizerEnabled, onChange: e => setFertilizerEnabled(e.target.checked), style: { width: 20, height: 20, accentColor: C.accent } })
+          ),
+          fertilizerEnabled && React.createElement('div', { display: "flex", flexDirection: "column", gap: 12 },
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Intervall (Tage)"),
+              React.createElement('input', { 
+                type: "number", 
+                value: fertilizerInterval, 
+                onChange: e => setFertilizerInterval(parseInt(e.target.value) || 14), 
+                min: 1, max: 365,
+                style: { ...inputStyle, padding: "10px 14px" }
+              })
+            ),
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Düngerart (optional)"),
+              React.createElement('input', { 
+                value: fertilizerType, 
+                onChange: e => setFertilizerType(e.target.value), 
+                placeholder: "z.B. Flüssigdünger, Langzeitdünger",
+                style: { ...inputStyle, padding: "10px 14px" }
+              })
+            )
+          )
+        ),
+        // Room selector
+        rooms.length > 0 && React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 10 } }, "📍 Raum (optional)"),
+          React.createElement('div', { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+            React.createElement('button', {
+              onClick: () => setRoomId(""),
+              style: { padding: "8px 14px", borderRadius: 10, border: !roomId ? `1.5px solid ${C.accent}` : `1px solid ${C.border}`, background: !roomId ? C.accentLight : C.card, cursor: "pointer", fontSize: 13 }
+            }, "Kein Raum"),
+            rooms.map(r => 
+              React.createElement('button', {
+                key: r.id,
+                onClick: () => setRoomId(r.id),
+                style: { padding: "8px 14px", borderRadius: 10, border: roomId === r.id ? `1.5px solid ${C.accent}` : `1px solid ${C.border}`, background: roomId === r.id ? C.accentLight : C.card, cursor: "pointer", fontSize: 13 }
+              }, `${r.icon} ${r.name}`)
+            )
+          )
+        ),
+        // Submit buttons
+        React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
+          React.createElement('button', {
+            onClick: submit, disabled: !name.trim() || isLoading,
+            style: { 
+              background: name.trim() && !isLoading ? C.accent : C.border, 
+              color: C.inverse, 
+              border: "none", 
+              borderRadius: 16, 
+              padding: "16px", 
+              fontSize: 16, 
+              fontWeight: 500, 
+              cursor: name.trim() && !isLoading ? "pointer" : "default",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8
+            }
+          }, isLoading ? "🤖 API wird aufgerufen..." : "🤖 Mit KI hinzufügen"),
+          React.createElement('button', {
+            onClick: addManually, disabled: !name.trim(),
+            style: { 
+              background: "transparent", 
+              color: C.text, 
+              border: `1.5px solid ${C.border}`, 
+              borderRadius: 16, 
+              padding: "14px", 
+              fontSize: 14, 
+              fontWeight: 500, 
+              cursor: name.trim() ? "pointer" : "default"
+            }
+          }, "Manuell hinzufügen")
+        )
       )
     );
   }
@@ -385,6 +1396,17 @@
     const [selectedPlant, setSelectedPlant] = useState(null);
     const [showAdd, setShowAdd] = useState(false);
     const [loaded, setLoaded] = useState(false);
+    const [rooms, setRooms] = useState(DEFAULT_ROOMS);
+    const [weather, setWeather] = useState(null);
+
+    useEffect(() => {
+      const currentTheme = getTheme();
+      C = currentTheme === "dark" ? C_DARK : C_LIGHT;
+      if (currentTheme === "dark") {
+        document.documentElement.classList.add("dark");
+        document.body.classList.add("dark");
+      }
+    }, []);
 
     useEffect(() => {
       try {
@@ -397,8 +1419,27 @@
           }));
           setPlants(migrated);
         }
-      } catch {}
+        
+        let roomsToUse = DEFAULT_ROOMS;
+        const savedRoomsRaw = localStorage.getItem("pflanzen_rooms");
+        if (savedRoomsRaw) {
+          try {
+            const savedRooms = JSON.parse(savedRoomsRaw);
+            if (Array.isArray(savedRooms) && savedRooms.length > 0) {
+              roomsToUse = savedRooms;
+            }
+          } catch(e) {
+            // Silent fail - use defaults
+          }
+        }
+        setRooms(roomsToUse);
+        
+      } catch (e) {
+        // Silent fail - use defaults
+        setRooms(DEFAULT_ROOMS);
+      }
       setLoaded(true);
+      fetchWeather().then(w => { if(w) setWeather(w); });
     }, []);
 
     // ── Gieß-Erinnerungs-Logik (Notification-Skeleton) ─────
@@ -420,24 +1461,43 @@
     }, []);
 
     const waterPlant = id => save(plants.map(p => p.id === id ? { ...p, last_watered_date: new Date().toISOString() } : p));
+    const fertilizePlant = id => save(plants.map(p => p.id === id ? { ...p, last_fertilized_date: new Date().toISOString() } : p));
     const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
 
     if (!loaded) return React.createElement('div', { id: 'loading', style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
       React.createElement('span', { style: { fontSize: 48 } }, "🌿")
     );
 
-    if (showAdd) return React.createElement(AddPlant, { onAdd: p => { save([...plants, p]); setShowAdd(false); }, onBack: () => setShowAdd(false) });
+    if (showAdd) return React.createElement(AddPlant, { onAdd: p => { save([...plants, p]); setShowAdd(false); }, onBack: () => setShowAdd(false), existingPlants: plants, rooms });
 
     if (selectedPlant) {
       const plant = plants.find(p => p.id === selectedPlant);
       if (!plant) { setSelectedPlant(null); return null; }
-      return React.createElement(PlantDetail, { plant, onBack: () => setSelectedPlant(null), onWater: waterPlant, onDelete: deletePlant });
+      return React.createElement(PlantDetail, { plant, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant });
     }
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
       view === "home" && React.createElement(HomeView, { plants, onWater: waterPlant, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
       view === "plants" && React.createElement(PlantsView, { plants, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
-      React.createElement(BottomNav, { active: view, onChange: setView, onAdd: () => setShowAdd(true) })
+      view === "rooms" && React.createElement(RoomView, { 
+        rooms, 
+        plants, 
+        weather, 
+        onSelectPlant: id => { setSelectedPlant(id); setView("plants"); },
+        onEditRoom: (id, data) => {
+          const updated = rooms.map(r => r.id === id ? {...r, ...data} : r);
+          setRooms(updated);
+          try { localStorage.setItem("pflanzen_rooms", JSON.stringify(updated)); } catch {}
+        },
+        onAddRoom: room => {
+          const updated = [...rooms, room];
+          setRooms(updated);
+          try { localStorage.setItem("pflanzen_rooms", JSON.stringify(updated)); } catch {}
+        }
+      }),
+      view === "discover" && React.createElement(DiscoverView),
+      view === "settings" && React.createElement(SettingsView),
+      React.createElement(BottomNav, { active: view, onChange: setView, onAdd: (view === "settings" || view === "rooms" || view === "discover") ? null : () => setShowAdd(true) })
     );
   }
 
