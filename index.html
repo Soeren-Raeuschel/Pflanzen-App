@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pflanzen" />
@@ -232,29 +232,132 @@
 
   function daysSince(d) {
     if (!d) return null;
-    return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+    try {
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return null;
+      return Math.floor((Date.now() - date.getTime()) / 86400000);
+    } catch { return null; }
   }
   function needsWater(p) {
+    if (!p || !p.type) return false;
     const d = daysSince(p.last_watered_date);
     if (d === null) return true;
-    return d >= (p.watering_interval || PLANT_DB[p.type]?.watering_interval || 7);
+    const interval = p.watering_interval || PLANT_DB[p.type]?.watering_interval || 7;
+    return d >= Math.max(1, interval);
   }
   function daysUntil(p) {
+    if (!p || !p.type) return 0;
     const d = daysSince(p.last_watered_date);
     if (d === null) return 0;
-    return Math.max(0, (p.watering_interval || PLANT_DB[p.type]?.watering_interval || 7) - d);
+    const interval = p.watering_interval || PLANT_DB[p.type]?.watering_interval || 7;
+    return Math.max(0, Math.max(1, interval) - d);
   }
   function needsFertilizer(p) {
-    if (!p.fertilizer_interval || p.fertilizer_interval === 0) return false;
+    if (!p || !p.fertilizer_interval || p.fertilizer_interval === 0) return false;
     const d = daysSince(p.last_fertilized_date);
     if (d === null) return true;
     return d >= p.fertilizer_interval;
   }
   function daysUntilFertilizer(p) {
-    if (!p.fertilizer_interval || p.fertilizer_interval === 0) return null;
+    if (!p || !p.fertilizer_interval || p.fertilizer_interval === 0) return null;
     const d = daysSince(p.last_fertilized_date);
     if (d === null) return 0;
     return Math.max(0, p.fertilizer_interval - d);
+  }
+
+  // Raumabhängige Gießanpassung - robust & productionsreif
+  function getAdaptiveWateringInterval(plant, room) {
+    if (!plant || !plant.type) {
+      return { interval: 7, reasons: [], baseInterval: 7 };
+    }
+    
+    const baseInterval = Math.max(1, plant.watering_interval || PLANT_DB[plant.type]?.watering_interval || 7);
+    
+    if (!room || (room.temperature === null && room.humidity === null)) {
+      return { interval: baseInterval, reasons: [], baseInterval };
+    }
+    
+    let adjustedInterval = baseInterval;
+    let adjustmentReason = [];
+    
+    // Temperatur-Anpassung (sicher mit null-checks)
+    const temp = typeof room.temperature === 'number' ? room.temperature : null;
+    if (temp !== null && !isNaN(temp)) {
+      if (temp >= 28) {
+        adjustedInterval = Math.max(1, Math.floor(baseInterval * 0.5));
+        adjustmentReason.push("sehr warm");
+      } else if (temp >= 25) {
+        adjustedInterval = Math.max(1, Math.floor(baseInterval * 0.7));
+        adjustmentReason.push("warm");
+      } else if (temp >= 22) {
+        adjustedInterval = Math.max(1, Math.floor(baseInterval * 0.85));
+        adjustmentReason.push("mäßig warm");
+      } else if (temp <= 8) {
+        adjustedInterval = Math.floor(baseInterval * 1.7);
+        adjustmentReason.push("kalt");
+      } else if (temp <= 12) {
+        adjustedInterval = Math.floor(baseInterval * 1.4);
+        adjustmentReason.push("kühl");
+      } else if (temp <= 15) {
+        adjustedInterval = Math.floor(baseInterval * 1.2);
+        adjustmentReason.push("frisch");
+      }
+    }
+    
+    // Luftfeuchtigkeits-Anpassung (sicher mit null-checks)
+    const humidity = typeof room.humidity === 'number' ? room.humidity : null;
+    if (humidity !== null && !isNaN(humidity)) {
+      if (humidity <= 25) {
+        adjustedInterval = Math.max(1, Math.floor(adjustedInterval * 0.5));
+        adjustmentReason.push("sehr trocken");
+      } else if (humidity <= 35) {
+        adjustedInterval = Math.max(1, Math.floor(adjustedInterval * 0.7));
+        adjustmentReason.push("trocken");
+      } else if (humidity <= 45) {
+        adjustedInterval = Math.max(1, Math.floor(adjustedInterval * 0.85));
+        adjustmentReason.push("gering feucht");
+      } else if (humidity >= 85) {
+        adjustedInterval = Math.floor(adjustedInterval * 1.7);
+        adjustmentReason.push("sehr feucht");
+      } else if (humidity >= 75) {
+        adjustedInterval = Math.floor(adjustedInterval * 1.4);
+        adjustmentReason.push("feucht");
+      } else if (humidity >= 65) {
+        adjustedInterval = Math.floor(adjustedInterval * 1.2);
+        adjustmentReason.push("mäßig feucht");
+      }
+    }
+    
+    const finalInterval = Math.max(1, Math.round(adjustedInterval));
+    
+    return {
+      interval: finalInterval,
+      reasons: adjustmentReason,
+      baseInterval: baseInterval,
+      wasAdjusted: finalInterval !== baseInterval
+    };
+  }
+
+  function needsWaterAdaptive(plant, rooms) {
+    if (!plant || !plant.type) return false;
+    if (!plant.room_id || !rooms || rooms.length === 0) return needsWater(plant);
+    const room = rooms.find(r => r && r.id === plant.room_id);
+    if (!room) return needsWater(plant);
+    const adaptive = getAdaptiveWateringInterval(plant, room);
+    const d = daysSince(plant.last_watered_date);
+    if (d === null) return true;
+    return d >= adaptive.interval;
+  }
+
+  function daysUntilAdaptive(plant, rooms) {
+    if (!plant || !plant.type) return 0;
+    if (!plant.room_id || !rooms || rooms.length === 0) return daysUntil(plant);
+    const room = rooms.find(r => r && r.id === plant.room_id);
+    if (!room) return daysUntil(plant);
+    const adaptive = getAdaptiveWateringInterval(plant, room);
+    const d = daysSince(plant.last_watered_date);
+    if (d === null) return 0;
+    return Math.max(0, adaptive.interval - d);
   }
 
   // ── Label ──────────────────────────────────────────────
@@ -487,7 +590,7 @@
       setEditingRoom(null);
     };
 
-    const roomPlants = (roomId) => plants.filter(p => p.room_id === roomId);
+    const roomPlants = (roomId) => (plants || []).filter(p => p.room_id === roomId);
 
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100 } },
       React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8 } }, "Räume"),
@@ -578,7 +681,7 @@
                 ),
                 // Room plants
                 rPlants.length > 0 ? 
-                  React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 8 }, key: p.id },
+                  React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 8 } },
                     rPlants.map(p => {
                       const issues = analyzeRoomConditions(p, room);
                       return React.createElement('div', { 
@@ -776,9 +879,9 @@ Nur JSON, keine Erklärungen.`;
   }
 
   // ── HomeView ───────────────────────────────────────────
-  function HomeView({ plants, onWater, onSelect, onAdd }) {
-    const thirsty = plants.filter(needsWater);
-    const upcoming = plants.filter(p => !needsWater(p)).sort((a, b) => daysUntil(a) - daysUntil(b)).slice(0, 4);
+  function HomeView({ plants, rooms, onWater, onSelect, onAdd }) {
+    const thirsty = plants.filter(p => needsWaterAdaptive(p, rooms));
+    const upcoming = plants.filter(p => !needsWaterAdaptive(p, rooms)).sort((a, b) => daysUntilAdaptive(a, rooms) - daysUntilAdaptive(b, rooms)).slice(0, 4);
 
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
       React.createElement('p', { style: { fontSize: 12, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 } },
@@ -796,6 +899,8 @@ Nur JSON, keine Erklärungen.`;
               thirsty.map(p => {
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
                 const d = daysSince(p.last_watered_date);
+                const room = rooms.find(r => r.id === p.room_id);
+                const adaptive = room ? getAdaptiveWateringInterval(p, room) : null;
                 return React.createElement('div', {
                   key: p.id,
                   style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.warnBorder}` },
@@ -804,7 +909,10 @@ Nur JSON, keine Erklärungen.`;
                   React.createElement('span', { style: { fontSize: 30 } }, info.icon),
                   React.createElement('div', { style: { flex: 1 } },
                     React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, p.name),
-                    React.createElement('p', { style: { fontSize: 12, color: C.warn } }, d === null ? "Noch nie gegossen" : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`)
+                    React.createElement('p', { style: { fontSize: 12, color: C.warn } }, 
+                      (d === null ? "Noch nie gegossen" : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`) + 
+                      (adaptive && adaptive.reasons.length > 0 ? ` • Angepasst: ${adaptive.reasons.join(", ")}` : "")
+                    )
                   ),
                   React.createElement('button', {
                     onClick: e => { e.stopPropagation(); onWater(p.id); },
@@ -830,7 +938,9 @@ Nur JSON, keine Erklärungen.`;
             React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
               upcoming.map(p => {
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
-                const d = daysUntil(p);
+                const d = daysUntilAdaptive(p, rooms);
+                const room = rooms.find(r => r.id === p.room_id);
+                const adaptive = room ? getAdaptiveWateringInterval(p, room) : null;
                 return React.createElement('div', {
                   key: p.id,
                   style: { background: C.card, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.border}` },
@@ -839,7 +949,7 @@ Nur JSON, keine Erklärungen.`;
                   React.createElement('span', { style: { fontSize: 28 } }, info.icon),
                   React.createElement('div', { style: { flex: 1 } },
                     React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, p.name),
-                    React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type)
+                    React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type + (adaptive && adaptive.reasons.length > 0 ? ` • ${adaptive.reasons.join(", ")}` : ""))
                   ),
                   React.createElement('span', { style: { fontSize: 12, color: C.accent, background: C.accentLight, padding: "4px 10px", borderRadius: 8, fontWeight: 500 } },
                     `in ${d} Tag${d !== 1 ? "en" : ""}`
@@ -888,7 +998,7 @@ Nur JSON, keine Erklärungen.`;
   }
 
   // ── PlantsView ─────────────────────────────────────────
-  function PlantsView({ plants, onSelect, onAdd }) {
+  function PlantsView({ plants, rooms, onSelect, onAdd }) {
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
       React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 } },
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Meine Pflanzen"),
@@ -898,7 +1008,10 @@ Nur JSON, keine Erklärungen.`;
         React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } },
           plants.map(p => {
             const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
-            const water = needsWater(p);
+            const water = needsWaterAdaptive(p, rooms);
+            const d = daysUntilAdaptive(p, rooms);
+            const room = rooms.find(r => r.id === p.room_id);
+            const adaptive = room ? getAdaptiveWateringInterval(p, room) : null;
             return React.createElement('div', {
               key: p.id, onClick: () => onSelect(p.id),
               style: { background: C.card, borderRadius: 20, padding: "18px 16px", cursor: "pointer", border: `1px solid ${water ? C.warnBorder : C.border}`, position: "relative" }
@@ -906,9 +1019,9 @@ Nur JSON, keine Erklärungen.`;
               water && React.createElement('div', { style: { position: "absolute", top: 10, right: 10, width: 8, height: 8, borderRadius: 4, background: C.warn } }),
               React.createElement('span', { style: { fontSize: 36, display: "block", marginBottom: 10 } }, info.icon),
               React.createElement('p', { style: { fontWeight: 500, fontSize: 15, marginBottom: 2 } }, p.name),
-              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 8 } }, p.type),
+              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 8 } }, p.type + (adaptive && adaptive.baseInterval !== adaptive.interval ? ` → ${adaptive.interval}d` : "")),
               React.createElement('div', { style: { fontSize: 11, color: water ? C.warn : C.accent, fontWeight: 500 } },
-                water ? "💧 Gießen!" : `💧 in ${daysUntil(p)}d`
+                water ? "💧 Gießen!" : `💧 in ${d}d`
               )
             );
           })
@@ -917,11 +1030,13 @@ Nur JSON, keine Erklärungen.`;
   }
 
   // ── PlantDetail ────────────────────────────────────────
-  function PlantDetail({ plant, onBack, onWater, onFertilize, onDelete }) {
+  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
-    const water = needsWater(plant);
+    const water = room ? needsWaterAdaptive(plant, [room]) : needsWater(plant);
     const days = daysSince(plant.last_watered_date);
     const [showDelete, setShowDelete] = useState(false);
+    const adaptive = room ? getAdaptiveWateringInterval(plant, room) : null;
+    const daysUntilVal = room ? daysUntilAdaptive(plant, [room]) : daysUntil(plant);
 
     const hasAiData = plant.aiData && Object.keys(plant.aiData).length > 0;
 
@@ -945,7 +1060,7 @@ Nur JSON, keine Erklärungen.`;
           ) :
           React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" } },
             React.createElement('div', null,
-              React.createElement('p', { style: { fontWeight: 500, color: C.accent } }, `Nächstes Gießen in ${plant.watering_interval || daysUntil(plant)} Tag${(plant.watering_interval || daysUntil(plant)) !== 1 ? "en" : ""}`),
+              React.createElement('p', { style: { fontWeight: 500, color: C.accent } }, `Nächstes Gießen in ${daysUntilVal} Tag${daysUntilVal !== 1 ? "en" : ""}` + (adaptive && adaptive.reasons.length > 0 ? ` (${adaptive.reasons.join(", ")})` : "")),
               React.createElement('p', { style: { fontSize: 13, color: C.muted } }, days === 0 ? "Heute gegossen ✓" : `Vor ${days} Tag${days !== 1 ? "en" : ""} gegossen`)
             ),
             React.createElement('button', { onClick: () => onWater(plant.id), style: { background: "none", color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Gießen")
@@ -1183,17 +1298,6 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
     const submit = async () => {
       if (!name.trim()) return;
       setError(null);
-
-      const normalizedName = name.trim().toLowerCase();
-      const exists = existingPlants.some(p => 
-        p.name.toLowerCase().includes(normalizedName) || 
-        normalizedName.includes(p.name.toLowerCase())
-      );
-
-      if (exists) {
-        setError("Diese Pflanze existiert bereits!");
-        return;
-      }
 
       setIsLoading(true);
       try {
@@ -1473,12 +1577,13 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
     if (selectedPlant) {
       const plant = plants.find(p => p.id === selectedPlant);
       if (!plant) { setSelectedPlant(null); return null; }
-      return React.createElement(PlantDetail, { plant, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant });
+      const room = rooms.find(r => r.id === plant.room_id);
+      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant });
     }
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
-      view === "home" && React.createElement(HomeView, { plants, onWater: waterPlant, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
-      view === "plants" && React.createElement(PlantsView, { plants, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
+      view === "home" && React.createElement(HomeView, { plants, rooms, onWater: waterPlant, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
+      view === "plants" && React.createElement(PlantsView, { plants, rooms, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
       view === "rooms" && React.createElement(RoomView, { 
         rooms, 
         plants, 
