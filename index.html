@@ -62,11 +62,227 @@
     "Zitrone":      { icon: "🍋", watering_interval: 5,  light: "Volle Sonne",      tip: "Kalkarmes Wasser bevorzugt. Im Winter kühler stellen.", humidity: "Mittel",  difficulty: "Mittel", description: "Zitruspflanze mit sauren Früchten.", origin: "Südasien" },
     "Olivenbaum":   { icon: "🌿", watering_interval: 14, light: "Volle Sonne",      tip: "Trockenresistent. Nicht überwässern, Staunässe vermeiden.", humidity: "Niedrig", difficulty: "Einfach", description: "Mediterraner Baum mit silbrigen Blättern.", origin: "Mittelmeerraum" },
     "Filzige":      { icon: "🍃", watering_interval: 7,  light: "Hell, indirekt",   tip: "Luftfeuchtigkeit wichtig. Regelmäßig besprühen.", humidity: "Hoch",  difficulty: "Mittel", description: "Tropische Pflanze mit samtigen Blättern.", origin: "Südamerika" },
-    "Andere":       { icon: "🌱", watering_interval: 7,  light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
+    "Andere":       { icon: "🌱", watering_interval: 7, light: "Indirekt",         tip: "Beobachte deine Pflanze genau und passe die Pflege entsprechend an.", humidity: "Mittel",  difficulty: "Mittel", description: "Individuelle Pflege für deine besondere Pflanze.", origin: "Unbekannt" },
   };
+
+  // Synonym database for plant matching
+  const PLANT_SYNONYMS = {
+    "Monstera": ["monstera", "monstera deliciosa", "swiss cheese plant", "fensterblatt", "gridelfisch"],
+    "Pothos": ["pothos", "epipremnum", "teufelsivy", "goldranke", "scindapsus"],
+    "Ficus": ["ficus", "ficus benjamina", "gummibaum", "ficus elastica", "ficus lyrata"],
+    "Kaktus": ["kaktus", "cactus", "sukkulente", "kakte"],
+    "Orchidee": ["orchidee", "orchid", "phalenopsis", "phaläne"],
+    "Aloe Vera": ["aloe", "aloe vera", "aloe vera", "echte aloe"],
+    "Lavendel": ["lavendel", "lavender", "echter lavendel"],
+    "Basilikum": ["basilikum", "basil", "ocimum", "echtes basilikum"],
+    "Palme": ["palme", "palm", "palma", "kentia", "areca", "date palm"],
+    "Sukkulente": ["sukkulente", "succulent", "dickblatt"],
+    "Efeu": ["efeu", "ivy", "hedera", "gemeiner efeu"],
+    "Bonsai": ["bonsai", "bonsai baum"],
+    "Rose": ["rose", "rosen", "rosaceae"],
+    "Spuckpalme": ["spuckpalme", "sperrblume", "streptocarpus"],
+    "Gummibaum": ["gummibaum", "gummibaum", "ficus elastica", "rubber plant"],
+    "Thymian": ["thymian", "thyme", "echter thymian"],
+    "Minze": ["minze", "mint", " Pfefferminze", "spearmint"],
+    "Friedenslilie": ["friedenslilie", "peace lily", "spathiphyllum"],
+    "Drachenbaum": ["drachenbaum", "dracaena", "dragon tree"],
+    "Bogenhanf": ["bogenhanf", "sansevieria", "schwiegermutterzunge", "snake plant"],
+    "Elefantenfuß": ["elefantenfuß", "elephant foot", "beaucarnea", "nolina"],
+    "Zamioculcas": ["zamioculcas", "zz plant", "zamioculcas zamiifolia"],
+    "Tomate": ["tomate", "tomato", "tomaten"],
+    "Paprika": ["paprika", "pepper", "chili", "capsicum"],
+    "Zitrone": ["zitrone", "lemon", "citrus", "limone"],
+    "Olivenbaum": ["olivenbaum", "olive tree", "olea"],
+  };
+
+  // Category fallback profiles with safe defaults
+  const CATEGORY_DEFAULTS = {
+    "succulent": { watering: 14, fertilizer: 30, light: "Direkte Sonne", humidity: "Niedrig", category: "Sukkulente" },
+    "tropical": { watering: 5, fertilizer: 14, light: "Hell, indirekt", humidity: "Hoch", category: "Tropisch" },
+    "herb": { watering: 3, fertilizer: 21, light: "Volle Sonne", humidity: "Mittel", category: "Kräuter" },
+    "vegetable": { watering: 2, fertilizer: 14, light: "Volle Sonne", humidity: "Mittel", category: "Gemüse" },
+    "tree": { watering: 7, fertilizer: 30, light: "Hell", humidity: "Mittel", category: "Baum" },
+    "fern": { watering: 4, fertilizer: 21, light: "Halbschatten", humidity: "Hoch", category: "Farn" },
+    "cactus": { watering: 21, fertilizer: 60, light: "Volle Sonne", humidity: "Niedrig", category: "Kaktus" },
+    "flowering": { watering: 5, fertilizer: 14, light: "Hell, indirekt", humidity: "Mittel", category: "Blühend" },
+    "foliage": { watering: 7, fertilizer: 21, light: "Indirekt", humidity: "Mittel", category: "Blattschmuck" },
+    "unknown": { watering: 7, fertilizer: 21, light: "Hell, indirekt", humidity: "Mittel", category: "Unbekannt" }
+  };
+
+  // Input normalization
+  function normalizeInput(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  }
+
+  // Levenshtein distance for fuzzy matching
+  function levenshteinDistance(a, b) {
+    if (!a || !b) return Math.max((a || '').length, (b || '').length);
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i-1) === a.charAt(j-1)) {
+          matrix[i][j] = matrix[i-1][j-1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i-1][j-1] + 1,
+            matrix[i][j-1] + 1,
+            matrix[i-1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  // Calculate similarity ratio (0-1)
+  function getSimilarity(a, b) {
+    const normA = normalizeInput(a);
+    const normB = normalizeInput(b);
+    if (normA === normB) return 1;
+    const maxLen = Math.max(normA.length, normB.length);
+    if (maxLen === 0) return 0;
+    return 1 - levenshteinDistance(normA, normB) / maxLen;
+  }
+
+  // Robust plant matching with multiple strategies
+  function matchPlant(input) {
+    const normalized = normalizeInput(input);
+    if (!normalized || normalized.length < 2) return null;
+
+    // Strategy 1: Exact match in PLANT_DB
+    if (PLANT_DB[normalized.charAt(0).toUpperCase() + normalized.slice(1)]) {
+      return { type: normalized.charAt(0).toUpperCase() + normalized.slice(1), confidence: 1.0, strategy: 'exact' };
+    }
+
+    // Strategy 2: Exact match in synonyms
+    for (const [mainName, synonyms] of Object.entries(PLANT_SYNONYMS)) {
+      if (synonyms.includes(normalized) || normalized.includes(mainName.toLowerCase())) {
+        return { type: mainName, confidence: 0.95, strategy: 'synonym' };
+      }
+    }
+
+    // Strategy 3: Fuzzy match (similarity > 0.6)
+    let bestMatch = null;
+    let bestScore = 0.6;
+    
+    for (const dbName of Object.keys(PLANT_DB)) {
+      const score = getSimilarity(normalized, dbName);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = dbName;
+      }
+      // Also check synonyms
+      const synonyms = PLANT_SYNONYMS[dbName] || [];
+      for (const syn of synonyms) {
+        const synScore = getSimilarity(normalized, syn);
+        if (synScore > bestScore) {
+          bestScore = synScore;
+          bestMatch = dbName;
+        }
+      }
+    }
+    
+    if (bestMatch) {
+      return { type: bestMatch, confidence: bestScore, strategy: 'fuzzy' };
+    }
+
+    // Strategy 4: Category-based matching based on keywords
+    const keywords = {
+      succulent: ['sukkulente', 'succulent', 'kaktus', 'cactus', 'aloe', 'agave', 'echeveria', 'sedum'],
+      tropical: ['tropisch', 'tropical', 'monstera', 'palm', 'banane', 'farn', 'orchidee'],
+      herb: ['kraut', 'herb', 'basilikum', 'thymian', 'rosmarin', 'salbei', 'minze', 'petersilie'],
+      vegetable: ['gemüse', 'vegetable', 'tomate', 'paprika', 'gurke', 'salat'],
+      tree: ['baum', 'tree', 'ficus', 'oliven', 'zitrone', 'avocado'],
+      fern: ['farn', 'fern', 'blau'],
+      flowering: ['blume', 'flower', 'rose', 'geranie', 'petunie'],
+      cactus: ['kaktus', 'cactus', 'opuntia', 'echinocactus']
+    };
+
+    for (const [category, words] of Object.entries(keywords)) {
+      for (const word of words) {
+        if (normalized.includes(word)) {
+          return { type: category, confidence: 0.5, strategy: 'category' };
+        }
+      }
+    }
+
+    // Strategy 5: Return null - fallback will handle this
+    return null;
+  }
+
+  // Get fallback data based on category
+  function getFallbackData(input, matchResult) {
+    const fallback = CATEGORY_DEFAULTS[matchResult?.type] || CATEGORY_DEFAULTS['unknown'];
+    const category = matchResult?.strategy || 'fallback';
+    
+    return {
+      name: input,
+      category: fallback.category,
+      confidence: matchResult?.confidence || 0.1,
+      strategy: category,
+      fallback: true,
+      water: `Alle ${fallback.water} Tage gießen`,
+      light: fallback.light,
+      humidity: fallback.humidity,
+      temperature: "18-25°C",
+      fertilizer_interval: fallback.fertilizer,
+      fertilizer_type: fallback.category === 'Sukkulente' || fallback.category === 'Kaktus' ? "Minimal düngen, nur in Wachstumsphase" : "Standard Dünger in Wachstumsphase",
+      notes: getFallbackMessage(fallback.category, category)
+    };
+  }
+
+  function getFallbackMessage(category, strategy) {
+    const messages = {
+      'Sukkulente': "Sukkulente speichern Wasser in ihren Blättern. Weniger gießen, Substrat zwischen den Gießgaben gut austrocknen lassen.",
+      'Tropisch': "Tropische Pflanzen brauchen mehr Wasser und hohe Luftfeuchtigkeit. Regelmäßig besprühen.",
+      'Kräuter': "Kräuter bevorzugen gleichmäßige Feuchtigkeit. Nicht austrocknen lassen.",
+      'Gemüse': "Gemüsepflanzen brauchen viel Wasser und regelmäßige Nährstoffe. Kontinuierlich düngen.",
+      'Baum': "Bäume brauchen tiefes Gießen. Erde zwischen den Gießgaben antrocknen lassen.",
+      'Farn': "Farne lieben Feuchtigkeit und Schatten. Erde gleichmäßig feucht halten.",
+      'Blühend': "Blühende Pflanzen brauchen mehr Energie. Regelmäßig düngen während der Blüte.",
+      'Blattschmuck': "Zierpflanzen mit festen Blättern sind meist pflegeleicht. Normal gießen.",
+      'Kaktus': "Kakteen brauchen sehr wenig Wasser. Nur gießen wenn Substrat komplett trocken.",
+      'Unbekannt': "Pflegehinweise basieren auf allgemeinen Richtwerten. An die Pflanze anpassen."
+    };
+    
+    let prefix = "";
+    if (strategy === 'category') prefix = "Basierend auf Kategorie-Erkennung: ";
+    else if (strategy === 'fallback') prefix = "Allgemeine Pflegerichtlinien: ";
+    else prefix = "Annäherung an ähnliche Pflanze: ";
+    
+    return prefix + (messages[category] || messages['Unbekannt']);
+  }
+
+  // Enhanced findMatchingType with fallback messaging
+  function findMatchingTypeWithFallback(plantName) {
+    const result = matchPlant(plantName);
+    if (result && result.strategy !== 'category') {
+      return { type: result.type, confidence: result.confidence, strategy: result.strategy, fallback: false };
+    }
+    if (result && result.strategy === 'category') {
+      const fallback = getFallbackData(plantName, result);
+      return { type: "Andere", confidence: result.confidence, strategy: result.strategy, fallback: true, fallbackData: fallback };
+    }
+    // No match at all - use generic fallback
+    const fallback = getFallbackData(plantName, { type: 'unknown', confidence: 0.1 });
+    return { type: "Andere", confidence: 0.1, strategy: 'fallback', fallback: true, fallbackData: fallback };
+  }
 
   function getPlantIcon(plantType) {
     return PLANT_DB[plantType]?.icon || "🌱";
+  }
+
+  // Get display name - use custom_name if available, otherwise fall back to name
+  function getDisplayName(plant) {
+    return plant?.custom_name || plant?.name || "Unbekannt";
   }
 
   const C_LIGHT = {
@@ -265,7 +481,347 @@
     return Math.max(0, p.fertilizer_interval - d);
   }
 
-  // Raumabhängige Gießanpassung - robust & productionsreif
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ERWEITERTE UMWELT-LOGIK: Konservativ & Überwässerungs-Sicher
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function getCurrentSeason() {
+    const month = new Date().getMonth() + 1;
+    if (month >= 3 && month <= 5) return "spring";
+    if (month >= 6 && month <= 8) return "summer";
+    if (month >= 9 && month <= 11) return "autumn";
+    return "winter";
+  }
+
+  function getSeasonName(season) {
+    const names = { spring: "Frühling", summer: "Sommer", autumn: "Herbst", winter: "Winter" };
+    return names[season] || "Unbekannt";
+  }
+
+  function getPlantCategory(type) {
+    const categories = {
+      succulent: ["Kaktus", "Sukkulente", "Aloe Vera", "Bogenhanf", "Zamioculcas", "Elefantenfuß"],
+      tropical: ["Monstera", "Orchidee", "Friedenslilie", "Drachenbaum", "Filzige", "Spuckpalme"],
+      herb: ["Basilikum", "Minze", "Thymian", "Lavendel"],
+      vegetable: ["Tomate", "Paprika", "Zitrone"],
+      tree: ["Ficus", "Palme", "Olivenbaum", "Bonsai", "Rose"],
+      vine: ["Pothos", "Efeu"],
+      other: ["Andere"]
+    };
+    for (const [cat, types] of Object.entries(categories)) {
+      if (types.includes(type)) return cat;
+    }
+    return "other";
+  }
+
+  function getBaseWateringInterval(plantType) {
+    const cat = getPlantCategory(plantType);
+    if (cat === "succulent") return 14;
+    if (cat === "tropical") return 5;
+    if (cat === "herb") return 3;
+    if (cat === "vegetable") return 3;
+    return 7;
+  }
+
+  const SEASON_MODIFIERS = {
+    summer: { water: 0.8, fertilizer: 1.5 },
+    spring: { water: 0.9, fertilizer: 1.2 },
+    autumn: { water: 1.1, fertilizer: 0.7 },
+    winter: { water: 1.4, fertilizer: 0.2 }
+  };
+
+  const LOCATION_MODIFIERS = {
+    balcony: 0.85,
+    garden: 0.9,
+    indoor: 1.0,
+    bathroom: 1.1,
+    kitchen: 1.0
+  };
+
+  const CLIMATE_MODIFIERS = {
+    hot: 0.85,
+    warm: 0.9,
+    moderate: 1.0,
+    cool: 1.15,
+    cold: 1.25
+  };
+
+  const LOCATION_TRANSLATIONS = {
+    balcony: "Balkon",
+    garden: "Garten",
+    indoor: "Innenraum",
+    bathroom: "Bad",
+    kitchen: "Küche"
+  };
+
+  const CLIMATE_TRANSLATIONS = {
+    hot: "Heiß",
+    warm: "Warm",
+    moderate: "Moderat",
+    cool: "Kühl",
+    cold: "Kalt"
+  };
+
+  function getLocationFromRoom(room) {
+    if (!room || !room.name) return "indoor";
+    const name = room.name.toLowerCase();
+    if (name.includes("balkon") || name.includes("terrasse")) return "balcony";
+    if (name.includes("garten") || name.includes("außen")) return "garden";
+    if (name.includes("bad")) return "bathroom";
+    if (name.includes("küche") || name.includes("kitchen")) return "kitchen";
+    return "indoor";
+  }
+
+  function determineClimate(temperature) {
+    if (temperature === null || temperature === undefined) return "moderate";
+    if (temperature >= 26) return "hot";
+    if (temperature >= 20) return "warm";
+    if (temperature >= 12) return "moderate";
+    return "cold";
+  }
+
+  // Hauptfunktion für sichere Gießanpassung
+  function getEnhancedWateringInterval(plant, room) {
+    if (!plant || !plant.type) {
+      return { interval: 7, reasons: [], baseInterval: 7, status: "standard", minDays: 2 };
+    }
+    
+    const baseInterval = getBaseWateringInterval(plant.type);
+    const season = getCurrentSeason();
+    const location = getLocationFromRoom(room);
+    const temperature = room?.temperature ?? null;
+    const climate = determineClimate(temperature);
+    
+    let adjusted = baseInterval;
+    let reasons = [];
+    let riskWarnings = [];
+    let wasAdjusted = false;
+    
+    // 1. Saison-Anpassung (konservativ)
+    const seasonMod = SEASON_MODIFIERS[season];
+    if (seasonMod) {
+      adjusted *= seasonMod.water;
+      wasAdjusted = true;
+      reasons.push(`${getSeasonName(season)}: ${seasonMod.water > 1 ? '+' : ''}${Math.round((seasonMod.water - 1) * 100)}%`);
+    }
+    
+    // 2. Standort-Anpassung
+    const locMod = LOCATION_MODIFIERS[location];
+    if (locMod) {
+      adjusted *= locMod;
+      wasAdjusted = true;
+      reasons.push(`Standort: ${LOCATION_TRANSLATIONS[location] || location}`);
+    }
+    
+    // 3. Klima-Anpassung
+    const climateMod = CLIMATE_MODIFIERS[climate];
+    if (climateMod) {
+      adjusted *= climateMod;
+      wasAdjusted = true;
+      reasons.push(`Klima: ${CLIMATE_TRANSLATIONS[climate] || climate}`);
+    }
+    
+    // 4. SICHERHEITS-BESCHRÄNKUNGEN
+    const cat = getPlantCategory(plant.type);
+    
+    // Sukkulenten: Mindestens 7 Tage
+    if (cat === "succulent") {
+      adjusted = Math.max(7, adjusted);
+      if (baseInterval * 0.7 > adjusted) {
+        reasons.push("Min 7 Tage (Sukkulente)");
+      }
+    }
+    
+    // Gesamt-Reduktion max 30%
+    const maxReduction = baseInterval * 0.7;
+    if (adjusted < maxReduction) {
+      adjusted = maxReduction;
+      reasons.push("Sicherheits-Begrenzung: max -30%");
+    }
+    
+    // Mindestens 2-3 Tage
+    const minInterval = cat === "succulent" ? 7 : (cat === "tropical" ? 2 : 3);
+    adjusted = Math.max(minInterval, adjusted);
+    
+    // 5. Warnungen bei Risiko
+    if (season === "winter" && location === "indoor" && cat !== "tropical") {
+      riskWarnings.push("Winter + Innenraum: Überwässerungsrisiko");
+    }
+    
+    if (season === "summer" && location === "balcony") {
+      riskWarnings.push("Balkon Sommer: Prüfe Erde häufiger");
+    }
+    
+    const finalInterval = Math.round(adjusted);
+    
+    // Status berechnen
+    const daysSinceWater = daysSince(plant.last_watered_date);
+    let status = "safe";
+    if (daysSinceWater !== null && daysSinceWater >= Math.floor(finalInterval * 0.7)) {
+      status = "ready";
+    } else if (daysSinceWater !== null && daysSinceWater < Math.floor(finalInterval * 0.5)) {
+      status = "too-early";
+    }
+    
+    return {
+      interval: finalInterval,
+      reasons: reasons,
+      baseInterval: baseInterval,
+      wasAdjusted: finalInterval !== baseInterval,
+      season: getSeasonName(season),
+      location: location,
+      climate: climate,
+      status: status,
+      riskWarnings: riskWarnings,
+      minDays: minInterval,
+      checkSoil: true
+    };
+  }
+
+  // Erweiterte Dünge-Logik
+  function getEnhancedFertilizerInterval(plant, room) {
+    if (!plant || !plant.fertilizer_interval || plant.fertilizer_interval === 0) {
+      return { interval: 0, active: false, reasons: [], seasonWarning: null };
+    }
+    
+    const season = getCurrentSeason();
+    const location = getLocationFromRoom(room);
+    const baseInterval = plant.fertilizer_interval;
+    let adjusted = baseInterval;
+    let reasons = [];
+    let seasonWarning = null;
+    
+    // Winter: drastisch reduzieren oder deaktivieren
+    if (season === "winter") {
+      adjusted = Math.max(45, baseInterval * 2);
+      seasonWarning = "Winter: Düngen reduzieren";
+      reasons.push("Winter - Ruhephase");
+    }
+    
+    // Sommer: etwas mehr
+    if (season === "summer") {
+      adjusted = Math.max(7, Math.floor(baseInterval * 0.8));
+      reasons.push("Sommer - Wachstumsphase");
+    }
+    
+    // Balkon im Sommer: etwas mehr
+    if (location === "balcony" && season === "summer") {
+      adjusted = Math.max(7, Math.floor(adjusted * 0.9));
+      reasons.push("Balkon im Sommer");
+    }
+    
+    return {
+      interval: Math.round(adjusted),
+      active: season !== "winter" || adjusted <= 60,
+      reasons: reasons,
+      baseInterval: baseInterval,
+      season: getSeasonName(season),
+      seasonWarning: seasonWarning
+    };
+  }
+
+  // Überwinterungs-Tipps für Balkonpflanzen
+  const OVERWINTERING_TIPS = {
+    "Monstera": {
+      bringIndoors: true,
+      minTemp: 15,
+      watering: "Reduzieren auf alle 10-14 Tage",
+      care: "Heller Standort, nicht direkt in Heizungsnähe",
+      frostRisk: "Hoch - unbedingt hereinholen"
+    },
+    "Kaktus": {
+      bringIndoors: true,
+      minTemp: 5,
+      watering: "Fast trocken halten, alle 3-4 Wochen",
+      care: "Kühler, heller Standort",
+      frostRisk: "Sehr hoch"
+    },
+    "Sukkulente": {
+      bringIndoors: true,
+      minTemp: 5,
+      watering: "Minimal, alle 3-4 Wochen",
+      care: "Heller, kühler Ort",
+      frostRisk: "Hoch"
+    },
+    "Olive": {
+      bringIndoors: false,
+      minTemp: -5,
+      watering: "Kaum gießen bei Kälte",
+      care: "Vor Wind schützen, Mulch um Topf",
+      frostRisk: "Mittel - verträgt leichten Frost"
+    },
+    "Lavendel": {
+      bringIndoors: false,
+      minTemp: -10,
+      watering: "Kaum gießen",
+      care: "Schnitt vor Winter, kann draußen bleiben",
+      frostRisk: "Niedrig - winterhart"
+    },
+    "Ficus": {
+      bringIndoors: true,
+      minTemp: 12,
+      watering: "Alle 7-10 Tage, Erde antrocknen lassen",
+      care: "Heller Standort, vor Zugluft schützen",
+      frostRisk: "Hoch"
+    },
+    "Palme": {
+      bringIndoors: true,
+      minTemp: 10,
+      watering: "Alle 7-10 Tage",
+      care: "Heller Standort, hohe Luftfeuchtigkeit",
+      frostRisk: "Mittel bis hoch"
+    },
+    "Oleander": {
+      bringIndoors: false,
+      minTemp: -5,
+      watering: "Leicht feucht halten",
+      care: "Kann draußen mit Winterschutz",
+      frostRisk: "Mittel"
+    },
+    "default": {
+      bringIndoors: true,
+      minTemp: 10,
+      watering: "Reduzieren, Erde zwischen Gießen trocknen lassen",
+      care: "Heller Standort drinnen, prüfen auf Schädlinge",
+      frostRisk: "Hoch - bei Frost hereinholen"
+    }
+  };
+
+  function getOverwinteringTips(plant, room) {
+    const season = getCurrentSeason();
+    const location = getLocationFromRoom(room);
+    
+    // Nur im Herbst und Winter für Balkonpflanzen anzeigen
+    if (location !== "balcony" || (season !== "autumn" && season !== "winter")) {
+      return null;
+    }
+    
+    const plantType = plant.type || "Andere";
+    const tips = OVERWINTERING_TIPS[plantType] || OVERWINTERING_TIPS["default"];
+    
+    // Aktuelle Temperatur berücksichtigen
+    const currentTemp = room?.temperature;
+    const needsIndoors = currentTemp !== null && currentTemp < tips.minTemp;
+    
+    const status = {
+      showTips: true,
+      season: getSeasonName(season),
+      location: "Balkon",
+      bringIndoors: tips.bringIndoors,
+      needsIndoorsNow: needsIndoors,
+      minTemperature: tips.minTemp,
+      wateringAdvice: tips.watering,
+      careAdvice: tips.care,
+      frostRisk: tips.frostRisk,
+      generalTip: season === "autumn" 
+        ? "🌨️ Winter steht bevor - bereite deine Pflanzen vor!"
+        : "❄️ Kälteperiode - prüfe regelmäßig den Zustand"
+    };
+    
+    return status;
+  }
+
+  // Fallback für Kompatibilität
   function getAdaptiveWateringInterval(plant, room) {
     if (!plant || !plant.type) {
       return { interval: 7, reasons: [], baseInterval: 7 };
@@ -343,7 +899,7 @@
     if (!plant.room_id || !rooms || rooms.length === 0) return needsWater(plant);
     const room = rooms.find(r => r && r.id === plant.room_id);
     if (!room) return needsWater(plant);
-    const adaptive = getAdaptiveWateringInterval(plant, room);
+    const adaptive = getEnhancedWateringInterval(plant, room, plant.watering_interval);
     const d = daysSince(plant.last_watered_date);
     if (d === null) return true;
     return d >= adaptive.interval;
@@ -354,7 +910,7 @@
     if (!plant.room_id || !rooms || rooms.length === 0) return daysUntil(plant);
     const room = rooms.find(r => r && r.id === plant.room_id);
     if (!room) return daysUntil(plant);
-    const adaptive = getAdaptiveWateringInterval(plant, room);
+    const adaptive = getEnhancedWateringInterval(plant, room, plant.watering_interval);
     const d = daysSince(plant.last_watered_date);
     if (d === null) return 0;
     return Math.max(0, adaptive.interval - d);
@@ -699,7 +1255,7 @@
                       },
                         React.createElement('span', { fontSize: 20 }, PLANT_DB[p.type]?.icon || "🌱"),
                         React.createElement('div', { flex: 1 },
-                          React.createElement('p', { fontSize: 13, fontWeight: 500 }, p.name),
+                          React.createElement('p', { fontSize: 13, fontWeight: 500 }, getDisplayName(p)),
                           issues.length > 0 && React.createElement('p', { fontSize: 11, color: C.warn }, issues[0])
                         )
                       );
@@ -717,7 +1273,15 @@
           value: newRoomName, 
           onChange: e => setNewRoomName(e.target.value), 
           placeholder: "Neuer Raum...",
-          style: { flex: 1, padding: "14px 16px", borderRadius: 14, border: `1px solid ${C.border}`, fontSize: 14 }
+          style: { 
+            flex: 1, 
+            padding: "14px 16px", 
+            borderRadius: 14, 
+            border: `1px solid ${C.border}`, 
+            fontSize: 14,
+            background: C.inputBg,
+            color: C.text
+          }
         }),
         React.createElement('button', { 
           onClick: handleAddRoom, 
@@ -900,7 +1464,7 @@ Nur JSON, keine Erklärungen.`;
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
                 const d = daysSince(p.last_watered_date);
                 const room = rooms.find(r => r.id === p.room_id);
-                const adaptive = room ? getAdaptiveWateringInterval(p, room) : null;
+                const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
                 return React.createElement('div', {
                   key: p.id,
                   style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.warnBorder}` },
@@ -908,10 +1472,14 @@ Nur JSON, keine Erklärungen.`;
                 },
                   React.createElement('span', { style: { fontSize: 30 } }, info.icon),
                   React.createElement('div', { style: { flex: 1 } },
-                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, p.name),
+                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, getDisplayName(p)),
                     React.createElement('p', { style: { fontSize: 12, color: C.warn } }, 
-                      (d === null ? "Noch nie gegossen" : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`) + 
-                      (adaptive && adaptive.reasons.length > 0 ? ` • Angepasst: ${adaptive.reasons.join(", ")}` : "")
+                      d === null ? "Noch nie gegossen" : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`
+                    ),
+                    adaptive &&                     React.createElement('div', { style: { display: "flex", gap: 4, marginTop: 4 } },
+                      React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, adaptive.season),
+                      React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, LOCATION_TRANSLATIONS[adaptive.location] || adaptive.location),
+                      adaptive.climate !== "moderate" && React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, CLIMATE_TRANSLATIONS[adaptive.climate] || adaptive.climate)
                     )
                   ),
                   React.createElement('button', {
@@ -940,7 +1508,7 @@ Nur JSON, keine Erklärungen.`;
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
                 const d = daysUntilAdaptive(p, rooms);
                 const room = rooms.find(r => r.id === p.room_id);
-                const adaptive = room ? getAdaptiveWateringInterval(p, room) : null;
+                const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
                 return React.createElement('div', {
                   key: p.id,
                   style: { background: C.card, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.border}` },
@@ -948,8 +1516,11 @@ Nur JSON, keine Erklärungen.`;
                 },
                   React.createElement('span', { style: { fontSize: 28 } }, info.icon),
                   React.createElement('div', { style: { flex: 1 } },
-                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, p.name),
-                    React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type + (adaptive && adaptive.reasons.length > 0 ? ` • ${adaptive.reasons.join(", ")}` : ""))
+                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, getDisplayName(p)),
+                    React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } },
+                      React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type),
+                      adaptive && React.createElement('span', { style: { fontSize: 9, background: C.accentLight, color: C.accent, padding: "2px 5px", borderRadius: 4 } }, `${adaptive.interval}d`)
+                    )
                   ),
                   React.createElement('span', { style: { fontSize: 12, color: C.accent, background: C.accentLight, padding: "4px 10px", borderRadius: 8, fontWeight: 500 } },
                     `in ${d} Tag${d !== 1 ? "en" : ""}`
@@ -982,7 +1553,7 @@ Nur JSON, keine Erklärungen.`;
                 },
                   React.createElement('span', { style: { fontSize: 28 } }, info.icon),
                   React.createElement('div', { style: { flex: 1 } },
-                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15, color: C.warm } }, p.name),
+                    React.createElement('p', { style: { fontWeight: 500, fontSize: 15, color: C.warm } }, getDisplayName(p)),
                     React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.fertilizer_type || `Alle ${p.fertilizer_interval} Tage`)
                   ),
                   React.createElement('span', { style: { fontSize: 12, color: C.warm, background: C.warmLight, padding: "4px 10px", borderRadius: 8, fontWeight: 500 } }, "Jetzt")
@@ -1011,15 +1582,17 @@ Nur JSON, keine Erklärungen.`;
             const water = needsWaterAdaptive(p, rooms);
             const d = daysUntilAdaptive(p, rooms);
             const room = rooms.find(r => r.id === p.room_id);
-            const adaptive = room ? getAdaptiveWateringInterval(p, room) : null;
+            const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
             return React.createElement('div', {
               key: p.id, onClick: () => onSelect(p.id),
               style: { background: C.card, borderRadius: 20, padding: "18px 16px", cursor: "pointer", border: `1px solid ${water ? C.warnBorder : C.border}`, position: "relative" }
             },
               water && React.createElement('div', { style: { position: "absolute", top: 10, right: 10, width: 8, height: 8, borderRadius: 4, background: C.warn } }),
               React.createElement('span', { style: { fontSize: 36, display: "block", marginBottom: 10 } }, info.icon),
-              React.createElement('p', { style: { fontWeight: 500, fontSize: 15, marginBottom: 2 } }, p.name),
-              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 8 } }, p.type + (adaptive && adaptive.baseInterval !== adaptive.interval ? ` → ${adaptive.interval}d` : "")),
+              React.createElement('p', { style: { fontWeight: 500, fontSize: 15, marginBottom: 2 } }, getDisplayName(p)),
+              React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+                React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type)
+              ),
               React.createElement('div', { style: { fontSize: 11, color: water ? C.warn : C.accent, fontWeight: 500 } },
                 water ? "💧 Gießen!" : `💧 in ${d}d`
               )
@@ -1030,23 +1603,48 @@ Nur JSON, keine Erklärungen.`;
   }
 
   // ── PlantDetail ────────────────────────────────────────
-  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete }) {
+  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete, onUpdateCustomName }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
     const water = room ? needsWaterAdaptive(plant, [room]) : needsWater(plant);
     const days = daysSince(plant.last_watered_date);
     const [showDelete, setShowDelete] = useState(false);
-    const adaptive = room ? getAdaptiveWateringInterval(plant, room) : null;
+    const [showCustomNameEdit, setShowCustomNameEdit] = useState(false);
+    const [customNameInput, setCustomNameInput] = useState(plant.custom_name || "");
+    const adaptive = room ? getEnhancedWateringInterval(plant, room) : null;
     const daysUntilVal = room ? daysUntilAdaptive(plant, [room]) : daysUntil(plant);
-
+    
     const hasAiData = plant.aiData && Object.keys(plant.aiData).length > 0;
+    const winterTips = room ? getOverwinteringTips(plant, room) : null;
+
+    const handleSaveCustomName = () => {
+      onUpdateCustomName(plant.id, customNameInput.trim());
+      setShowCustomNameEdit(false);
+    };
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 40 } },
       // Header
       React.createElement('div', { style: { background: water ? C.warnLight : C.accentLight, padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 28px`, borderBottom: `1px solid ${C.border}` } },
-        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0 } }, "←"),
+        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0, color: C.text } }, "←"),
         React.createElement('div', { style: { fontSize: 64, marginBottom: 12 } }, info.icon),
-        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 36, fontWeight: 500 } }, plant.name),
-        React.createElement('p', { style: { color: C.muted, fontSize: 15 } }, plant.type)
+        React.createElement('div', null,
+          React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 36, fontWeight: 500 } }, getDisplayName(plant)),
+          React.createElement('p', { style: { color: C.muted, fontSize: 15 } }, plant.type),
+          showCustomNameEdit ?
+            React.createElement('div', { style: { display: "flex", gap: 8, marginTop: 8 } },
+              React.createElement('input', {
+                value: customNameInput,
+                onChange: e => setCustomNameInput(e.target.value),
+                placeholder: "Eigener Name...",
+                style: { flex: 1, padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14, background: C.card, color: C.text }
+              }),
+              React.createElement('button', { onClick: handleSaveCustomName, style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" } }, "✓"),
+              React.createElement('button', { onClick: () => { setCustomNameInput(plant.custom_name || ""); setShowCustomNameEdit(false); }, style: { background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" } }, "✕")
+            ) :
+            React.createElement('button', { 
+              onClick: () => setShowCustomNameEdit(true), 
+              style: { background: "none", border: "none", fontSize: 12, color: C.muted, marginTop: 4, cursor: "pointer", textDecoration: "underline" } 
+            }, plant.custom_name ? "Name ändern" : "Eigenen Namen hinzufügen")
+        )
       ),
       React.createElement('div', { style: { padding: "24px 20px" } },
         // Water status
@@ -1060,8 +1658,15 @@ Nur JSON, keine Erklärungen.`;
           ) :
           React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" } },
             React.createElement('div', null,
-              React.createElement('p', { style: { fontWeight: 500, color: C.accent } }, `Nächstes Gießen in ${daysUntilVal} Tag${daysUntilVal !== 1 ? "en" : ""}` + (adaptive && adaptive.reasons.length > 0 ? ` (${adaptive.reasons.join(", ")})` : "")),
-              React.createElement('p', { style: { fontSize: 13, color: C.muted } }, days === 0 ? "Heute gegossen ✓" : `Vor ${days} Tag${days !== 1 ? "en" : ""} gegossen`)
+              React.createElement('p', { style: { fontWeight: 500, color: C.accent, fontSize: 15 } }, `Nächstes Gießen in ${daysUntilVal} Tag${daysUntilVal !== 1 ? "en" : ""}`),
+              days === 0 ? 
+                React.createElement('p', { style: { fontSize: 12, color: C.accent, marginTop: 4 } }, "✓ Heute gegossen") :
+                React.createElement('p', { style: { fontSize: 12, color: C.muted, marginTop: 4 } }, `Zuletzt vor ${days} Tag${days !== 1 ? "en" : ""}`),
+              adaptive && React.createElement('div', { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 } },
+                React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `📅 ${adaptive.season}`),
+                React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `📍 ${LOCATION_TRANSLATIONS[adaptive.location] || adaptive.location}`),
+                adaptive && React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `🌡️ ${CLIMATE_TRANSLATIONS[adaptive.climate] || adaptive.climate}`)
+              )
             ),
             React.createElement('button', { onClick: () => onWater(plant.id), style: { background: "none", color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Gießen")
           ),
@@ -1149,6 +1754,35 @@ Nur JSON, keine Erklärungen.`;
         plant.notes && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
           React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Meine Notizen"),
           React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, plant.notes)
+        ),
+        // Winter tips for balcony plants
+        winterTips && winterTips.showTips && React.createElement('div', { style: { background: C.accentLight, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.accent}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.accent, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, `🌨️ ${winterTips.season}-Tipps für Balkon`),
+          React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
+            winterTips.needsIndoorsNow && React.createElement('div', { style: { background: C.warnLight, borderRadius: 12, padding: "12px", border: `1px solid ${C.warnBorder}` } },
+              React.createElement('p', { style: { fontSize: 14, fontWeight: 600, color: C.warn } }, "⚠️ Jetzt reinholen!"),
+              React.createElement('p', { style: { fontSize: 13, color: C.text } }, `Temperatur unter ${winterTips.minTemperature}°C - Frostgefahr!`)
+            ),
+            React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } },
+              React.createElement('div', null,
+                React.createElement('p', { style: { fontSize: 11, color: C.muted, marginBottom: 4 } }, "🌡️ Mindest-Temperatur"),
+                React.createElement('p', { style: { fontSize: 13, fontWeight: 500 } }, `${winterTips.minTemperature}°C`)
+              ),
+              React.createElement('div', null,
+                React.createElement('p', { style: { fontSize: 11, color: C.muted, marginBottom: 4 } }, "❄️ Frost-Risiko"),
+                React.createElement('p', { style: { fontSize: 13, fontWeight: 500 } }, winterTips.frostRisk)
+              )
+            ),
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginBottom: 4 } }, "💧 Gießen"),
+              React.createElement('p', { style: { fontSize: 13 } }, winterTips.wateringAdvice)
+            ),
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginBottom: 4 } }, "🌿 Pflege"),
+              React.createElement('p', { style: { fontSize: 13 } }, winterTips.careAdvice)
+            )
+          ),
+          React.createElement('p', { style: { fontSize: 12, color: C.muted, marginTop: 8, fontStyle: "italic" } }, winterTips.generalTip)
         ),
         // Delete
         !showDelete ?
@@ -1285,6 +1919,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
   // ── AddPlant ───────────────────────────────────────────
   function AddPlant({ onAdd, onBack, existingPlants = [], rooms = [] }) {
     const [name, setName] = useState("");
+    const [customName, setCustomName] = useState("");
     const [type, setType] = useState("Monstera");
     const [notes, setNotes] = useState("");
     const [alreadyWatered, setAlreadyWatered] = useState(true);
@@ -1294,32 +1929,60 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
     const [roomId, setRoomId] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [matchInfo, setMatchInfo] = useState(null);
 
     const submit = async () => {
       if (!name.trim()) return;
       setError(null);
+      setMatchInfo(null);
 
       setIsLoading(true);
       try {
         const aiData = await fetchPlantData(name.trim());
         
+        // Use robust matching
+        const matchResult = findMatchingTypeWithFallback(aiData.name || name.trim());
+        
         const wateringInterval = parseInt(aiData.water?.match(/\d+/)?.[0] || "7");
         const aiFertilizerInterval = parseInt(aiData.fertilizer_interval) || 0;
+        
+        // Build aiData with fallback info
+        let plantAiData = {
+          light: aiData.light,
+          water: aiData.water,
+          humidity: aiData.humidity,
+          temperature: aiData.temperature,
+          fertilizer: aiData.fertilizer_type || aiData.fertilizer,
+          notes: aiData.notes || ""
+        };
+        
+        // If using fallback, merge fallback data
+        if (matchResult.fallback && matchResult.fallbackData) {
+          setMatchInfo({
+            fallback: true,
+            message: matchResult.fallbackData.notes,
+            category: matchResult.fallbackData.category
+          });
+          // Override with fallback data for safety
+          plantAiData = { ...plantAiData, ...matchResult.fallbackData };
+        } else {
+          setMatchInfo({
+            fallback: false,
+            confidence: Math.round((matchResult.confidence || 0.9) * 100)
+          });
+        }
         
         const newPlant = {
           id: Date.now().toString(),
           name: aiData.name || name.trim(),
-          type: findMatchingType(aiData.name || name.trim()),
+          custom_name: customName.trim() || null,
+          type: matchResult.type,
+          matchConfidence: matchResult.confidence,
+          matchStrategy: matchResult.strategy,
+          isFallback: matchResult.fallback || false,
           notes: notes,
           last_watered_date: alreadyWatered ? new Date().toISOString() : null,
-          aiData: {
-            light: aiData.light,
-            water: aiData.water,
-            humidity: aiData.humidity,
-            temperature: aiData.temperature,
-            fertilizer: aiData.fertilizer_type || aiData.fertilizer,
-            notes: aiData.notes || ""
-          },
+          aiData: plantAiData,
           watering_interval: wateringInterval,
           fertilizer_interval: fertilizerEnabled ? fertilizerInterval : (aiFertilizerInterval > 0 ? aiFertilizerInterval : 0),
           fertilizer_type: fertilizerEnabled ? fertilizerType : (aiData.fertilizer_type || aiData.fertilizer || ""),
@@ -1328,10 +1991,37 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
         };
         onAdd(newPlant);
       } catch (e) {
-        const errorMessage = e.message.includes('Zeitüberschreitung') || e.message.includes('timeout') 
-          ? "Zeitüberschreitung. Bitte erneut versuchen." 
-          : "Fehler: " + e.message;
-        setError(errorMessage);
+        // Fallback: use robust matching even if API fails
+        const matchResult = findMatchingTypeWithFallback(name.trim());
+        const fallbackData = matchResult.fallbackData || getFallbackData(name.trim(), { type: 'unknown' });
+        
+        setMatchInfo({
+          fallback: true,
+          message: fallbackData.notes,
+          category: fallbackData.category,
+          apiError: true
+        });
+        
+        const wateringInterval = parseInt(fallbackData.water?.match(/\d+/)?.[0] || "7");
+        
+        const newPlant = {
+          id: Date.now().toString(),
+          name: name.trim(),
+          custom_name: customName.trim() || null,
+          type: "Andere",
+          matchConfidence: 0.1,
+          matchStrategy: 'fallback',
+          isFallback: true,
+          notes: notes,
+          last_watered_date: alreadyWatered ? new Date().toISOString() : null,
+          aiData: fallbackData,
+          watering_interval: wateringInterval,
+          fertilizer_interval: fertilizerEnabled ? fertilizerInterval : fallbackData.fertilizer_interval,
+          fertilizer_type: fertilizerEnabled ? fertilizerType : fallbackData.fertilizer_type,
+          last_fertilized_date: (fertilizerEnabled || fallbackData.fertilizer_interval > 0) ? new Date().toISOString() : null,
+          room_id: roomId || null
+        };
+        onAdd(newPlant);
       } finally {
         setIsLoading(false);
       }
@@ -1342,6 +2032,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
       const newPlant = {
         id: Date.now().toString(),
         name: name.trim(),
+        custom_name: customName.trim() || null,
         type: type,
         notes: notes,
         last_watered_date: alreadyWatered ? new Date().toISOString() : null,
@@ -1366,7 +2057,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, borderBottom: `1px solid ${C.border}` } },
-        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0 } }, "←"),
+        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0, color: C.text } }, "←"),
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Neue Pflanze")
       ),
       React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 } },
@@ -1380,12 +2071,42 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
             style: inputStyle 
           })
         ),
+        // Custom name (optional)
+        React.createElement('div', null,
+          React.createElement(Label, null, "Eigener Name (optional)"),
+          React.createElement('input', { 
+            value: customName, 
+            onChange: e => setCustomName(e.target.value), 
+            placeholder: "z.B. Paul, Küchen-Monstera", 
+            style: inputStyle 
+          }),
+          React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 4 } }, "Falls du deine Pflanze anders nennen möchtest")
+        ),
         // AI hint
         React.createElement('div', { style: { fontSize: 12, color: C.muted, background: C.accentLight, padding: "10px 14px", borderRadius: 10 } },
           "🤖 Gib den Pflanzennamen ein und klicke auf 'Pflanze hinzufügen' für automatische KI-Pflegeinfos"
         ),
         // Error message
         error && React.createElement('div', { style: { background: C.warnLight, border: `1px solid ${C.warnBorder}`, borderRadius: 12, padding: "12px 14px", color: C.warn, fontSize: 13 } }, error),
+        // Match info / fallback message
+        matchInfo && React.createElement('div', { 
+          style: { 
+            background: matchInfo.fallback ? C.warnLight : C.accentLight, 
+            border: `1px solid ${matchInfo.fallback ? C.warnBorder : C.accent}`, 
+            borderRadius: 12, 
+            padding: "12px 14px", 
+            fontSize: 13 
+          } 
+        },
+          matchInfo.fallback 
+            ? React.createElement('div', null,
+                React.createElement('p', { style: { fontWeight: 500, color: C.warn, marginBottom: 4 } }, "🔍 Annäherung verwendet"),
+                React.createElement('p', { style: { color: C.text } }, matchInfo.message)
+              )
+            : matchInfo.confidence 
+              ? React.createElement('p', { style: { color: C.accent } }, `✅ Pflanze erkannt (${matchInfo.confidence}% Übereinstimmung)`)
+              : null
+        ),
         // Type grid
         React.createElement('div', null,
           React.createElement(Label, null, "Pflanzenart (alternativ manuell wählen)"),
@@ -1406,16 +2127,51 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
           React.createElement(Label, null, "Notizen (optional)"),
           React.createElement('textarea', { value: notes, onChange: e => setNotes(e.target.value), placeholder: "Beobachtungen, Standort...", rows: 3, style: { ...inputStyle, resize: "none" } })
         ),
-        // Checkbox
+        // Checkbox - Water
         React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, background: C.card, borderRadius: 14, padding: "14px 16px", border: `1px solid ${C.border}` } },
-          React.createElement('input', { type: "checkbox", id: "watered", checked: alreadyWatered, onChange: e => setAlreadyWatered(e.target.checked), style: { width: 18, height: 18, accentColor: C.accent, cursor: "pointer" } }),
-          React.createElement('label', { htmlFor: "watered", style: { fontSize: 14, cursor: "pointer" } }, "Heute schon gegossen?")
+          React.createElement('div', { 
+            style: { 
+              width: 24, 
+              height: 24, 
+              borderRadius: 6, 
+              border: `2px solid ${alreadyWatered ? C.accent : C.border}`,
+              background: alreadyWatered ? C.accent : "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: 16,
+              color: "#fff",
+              userSelect: "none"
+            },
+            onClick: () => setAlreadyWatered(!alreadyWatered)
+          }, alreadyWatered ? "✓" : ""),
+          React.createElement('span', { 
+            style: { fontSize: 14, cursor: "pointer", flex: 1, userSelect: "none" },
+            onClick: () => setAlreadyWatered(!alreadyWatered)
+          }, "Heute schon gegossen?")
         ),
         // Fertilizer section
         React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
           React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
-            React.createElement('p', { style: { fontSize: 14, fontWeight: 500 } }, "🧪 Düngeprogramm"),
-            React.createElement('input', { type: "checkbox", checked: fertilizerEnabled, onChange: e => setFertilizerEnabled(e.target.checked), style: { width: 20, height: 20, accentColor: C.accent } })
+            React.createElement('p', { style: { fontSize: 14, fontWeight: 500, userSelect: "none" } }, "🧪 Düngeprogramm aktivieren"),
+            React.createElement('div', { 
+              style: { 
+                width: 24, 
+                height: 24, 
+                borderRadius: 6, 
+                border: `2px solid ${fertilizerEnabled ? C.accent : C.border}`,
+                background: fertilizerEnabled ? C.accent : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                fontSize: 16,
+                color: "#fff",
+                userSelect: "none"
+              },
+              onClick: () => setFertilizerEnabled(!fertilizerEnabled)
+            }, fertilizerEnabled ? "✓" : "")
           ),
           fertilizerEnabled && React.createElement('div', { display: "flex", flexDirection: "column", gap: 12 },
             React.createElement('div', null,
@@ -1445,13 +2201,13 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
           React.createElement('div', { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
             React.createElement('button', {
               onClick: () => setRoomId(""),
-              style: { padding: "8px 14px", borderRadius: 10, border: !roomId ? `1.5px solid ${C.accent}` : `1px solid ${C.border}`, background: !roomId ? C.accentLight : C.card, cursor: "pointer", fontSize: 13 }
+              style: { padding: "8px 14px", borderRadius: 10, border: !roomId ? `1.5px solid ${C.accent}` : `1px solid ${C.border}`, background: !roomId ? C.accentLight : C.card, cursor: "pointer", fontSize: 13, color: C.text }
             }, "Kein Raum"),
             rooms.map(r => 
               React.createElement('button', {
                 key: r.id,
                 onClick: () => setRoomId(r.id),
-                style: { padding: "8px 14px", borderRadius: 10, border: roomId === r.id ? `1.5px solid ${C.accent}` : `1px solid ${C.border}`, background: roomId === r.id ? C.accentLight : C.card, cursor: "pointer", fontSize: 13 }
+                style: { padding: "8px 14px", borderRadius: 10, border: roomId === r.id ? `1.5px solid ${C.accent}` : `1px solid ${C.border}`, background: roomId === r.id ? C.accentLight : C.card, cursor: "pointer", fontSize: 13, color: C.text }
               }, `${r.icon} ${r.name}`)
             )
           )
@@ -1462,7 +2218,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
             onClick: submit, disabled: !name.trim() || isLoading,
             style: { 
               background: name.trim() && !isLoading ? C.accent : C.border, 
-              color: C.inverse, 
+              color: name.trim() && !isLoading ? C.inverse : C.muted, 
               border: "none", 
               borderRadius: 16, 
               padding: "16px", 
@@ -1567,6 +2323,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
     const waterPlant = id => save(plants.map(p => p.id === id ? { ...p, last_watered_date: new Date().toISOString() } : p));
     const fertilizePlant = id => save(plants.map(p => p.id === id ? { ...p, last_fertilized_date: new Date().toISOString() } : p));
     const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
+    const updateCustomName = (id, customName) => save(plants.map(p => p.id === id ? { ...p, custom_name: customName || null } : p));
 
     if (!loaded) return React.createElement('div', { id: 'loading', style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
       React.createElement('span', { style: { fontSize: 48 } }, "🌿")
@@ -1578,7 +2335,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
       const plant = plants.find(p => p.id === selectedPlant);
       if (!plant) { setSelectedPlant(null); return null; }
       const room = rooms.find(r => r.id === plant.room_id);
-      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant });
+      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName });
     }
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
@@ -1607,6 +2364,43 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
   }
 
   ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+
+  // ============================================
+  // TEST SUITE - Run with runTests() in console
+  // ============================================
+  
+  (function() {
+    'use strict';
+    const TestRunner = { results: [], log(testName, passed, details) { this.results.push({ testName, passed, details }); console.log((passed ? '✅' : '❌') + ' ' + testName + (details ? ': ' + details : '')); }, summary() { const p = this.results.filter(r => r.passed).length; const f = this.results.filter(r => !r.passed).length; console.log('\n' + '='.repeat(40) + '\nSUMMARY: ' + p + ' passed, ' + f + ' failed\n' + '='.repeat(40)); return { passed: p, failed: f }; } };
+    function runAllTests() {
+      console.log('\n=== PFLANZEN APP TEST SUITE ===\n');
+      try {
+        TestRunner.log('PLANT_DB loaded', !!PLANT_DB, Object.keys(PLANT_DB).length + ' plants');
+        TestRunner.log('normalizeInput works', normalizeInput('Monstera') === 'monstera');
+        TestRunner.log('sanitizeInput removes XSS', !sanitizeInput('<script>').includes('<script>'));
+        TestRunner.log('matchPlant exact', matchPlant('Monstera')?.type === 'Monstera');
+        TestRunner.log('matchPlant synonym', matchPlant('Swiss Cheese Plant')?.type === 'Monstera');
+        TestRunner.log('getPlantCategory kaktus', getPlantCategory('Kaktus') === 'succulent');
+        TestRunner.log('getPlantCategory basilikum', getPlantCategory('Basilikum') === 'herb');
+        TestRunner.log('SEASON_MODIFIERS', !!SEASON_MODIFIERS.summer);
+        TestRunner.log('LOCATION_MODIFIERS', !!LOCATION_MODIFIERS.balcony);
+        TestRunner.log('CLIMATE_MODIFIERS', !!CLIMATE_MODIFIERS.hot);
+        TestRunner.log('CATEGORY_DEFAULTS', !!CATEGORY_DEFAULTS.succulent);
+        TestRunner.log('getFallbackData', !!getFallbackData('X', { type: 'unknown' }).water);
+        TestRunner.log('getEnhancedWateringInterval', !!getEnhancedWateringInterval({ type: 'Monstera', last_watered_date: null }, { name: 'Wohnzimmer', temperature: 20 }).interval);
+        const kaktusResult = getEnhancedWateringInterval({ type: 'Kaktus', last_watered_date: null }, { name: 'Balkon', temperature: 25 });
+        TestRunner.log('Kaktus min 7 days', kaktusResult.interval >= 7, kaktusResult.interval + ' days');
+        const base = getBaseWateringInterval('Sukkulente');
+        const minAllowed = base * 0.7;
+        TestRunner.log('Safety cap applied', kaktusResult.interval >= minAllowed);
+        TestRunner.log('Dark mode toggle', (setThemeMode('dark'), getTheme() === 'dark'));
+        TestRunner.log('Dark mode restored', (setThemeMode('light'), getTheme() === 'light'));
+      } catch(e) { console.error('Test error:', e); }
+      return TestRunner.summary();
+    }
+    window.runTests = runAllTests;
+    console.log('✅ Tests verfügbar: runTests() eingeben\n');
+  })();
   </script>
 
 </body>
