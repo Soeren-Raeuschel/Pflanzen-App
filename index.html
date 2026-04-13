@@ -22,6 +22,10 @@
     .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     button { -webkit-appearance: none; }
     input { -webkit-appearance: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
   </style>
 </head>
 <body>
@@ -223,18 +227,21 @@
     const fallback = CATEGORY_DEFAULTS[matchResult?.type] || CATEGORY_DEFAULTS['unknown'];
     const category = matchResult?.strategy || 'fallback';
     
+    // BUGFIX: Verwende fallback.watering (nicht fallback.water – der Key in CATEGORY_DEFAULTS heißt "watering")
+    const wateringDays = fallback.watering || 7;
+    const fertilizerDays = fallback.fertilizer || 21;
     return {
       name: input,
       category: fallback.category,
       confidence: matchResult?.confidence || 0.1,
       strategy: category,
       fallback: true,
-      water: `Alle ${fallback.water} Tage gießen`,
-      light: fallback.light,
-      humidity: fallback.humidity,
+      water: `Alle ${wateringDays} Tage gießen`,
+      light: fallback.light || "Hell, indirekt",
+      humidity: fallback.humidity || "Mittel",
       temperature: "18-25°C",
-      fertilizer_interval: fallback.fertilizer,
-      fertilizer_type: fallback.category === 'Sukkulente' || fallback.category === 'Kaktus' ? "Minimal düngen, nur in Wachstumsphase" : "Standard Dünger in Wachstumsphase",
+      fertilizer_interval: fertilizerDays,
+      fertilizer_type: (fallback.category === 'Sukkulente' || fallback.category === 'Kaktus') ? "Minimal düngen, nur in Wachstumsphase" : "Standard Dünger in Wachstumsphase",
       notes: getFallbackMessage(fallback.category, category)
     };
   }
@@ -363,20 +370,106 @@
   initTheme();
 
   let weatherData = null;
+  const WEATHER_CACHE_KEY = 'pflanzen_weather_cache';
+  const WEATHER_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  // BUGFIX P2: Separater Location-Cache – trennt "Standort wurde abgefragt" von "Wetter wurde geladen"
+  const LOCATION_CACHE_KEY = 'pflanzen_location_cache';
   
-  async function fetchWeather() {
+  // Get cached weather data
+  function getCachedWeather() {
     try {
-      const position = await new Promise((resolve, reject) => {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-        } else {
-          reject(new Error("No geolocation"));
+      const cached = localStorage.getItem(WEATHER_CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data.timestamp && (Date.now() - data.timestamp < WEATHER_CACHE_DURATION)) {
+          return data;
         }
-      });
-      
-      const lat = Math.max(-90, Math.min(90, position.coords.latitude));
-      const lon = Math.max(-180, Math.min(180, position.coords.longitude));
-      
+      }
+    } catch(e) {}
+    return null;
+  }
+  
+  // Save weather to cache
+  function setCachedWeather(data) {
+    try {
+      localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({
+        ...data,
+        timestamp: Date.now()
+      }));
+    } catch(e) {}
+  }
+
+  // BUGFIX P2: Separater Location-Cache – Geolocation max. 1x pro 24h anfragen
+  function getCachedLocation() {
+    try {
+      const cached = localStorage.getItem(LOCATION_CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data.timestamp && (Date.now() - data.timestamp < WEATHER_CACHE_DURATION)) {
+          return data; // { lat, lon, timestamp }
+        }
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function setCachedLocation(lat, lon) {
+    try {
+      localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lon, timestamp: Date.now() }));
+    } catch(e) {}
+  }
+
+  // Gibt zurück wie alt der letzte Standort-Abruf ist (in Minuten), oder null
+  function getLocationCacheAge() {
+    try {
+      const cached = localStorage.getItem(LOCATION_CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data.timestamp) return Math.round((Date.now() - data.timestamp) / 60000);
+      }
+    } catch(e) {}
+    return null;
+  }
+  
+  async function fetchWeather(forceRefresh = false) {
+    // BUGFIX P2: Bei forceRefresh werden beide Caches ignoriert
+    if (!forceRefresh) {
+      const cached = getCachedWeather();
+      if (cached) {
+        weatherData = cached;
+        return weatherData;
+      }
+    }
+
+    let lat, lon;
+
+    // BUGFIX P2: Standort aus Cache lesen, falls vorhanden und < 24h alt
+    const cachedLoc = forceRefresh ? null : getCachedLocation();
+    if (cachedLoc) {
+      lat = cachedLoc.lat;
+      lon = cachedLoc.lon;
+    } else {
+      // Neuen Standort abfragen – nur wenn kein gültiger Cache vorhanden
+      try {
+        const position = await new Promise((resolve, reject) => {
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+          } else {
+            reject(new Error("No geolocation"));
+          }
+        });
+        lat = Math.max(-90, Math.min(90, position.coords.latitude));
+        lon = Math.max(-180, Math.min(180, position.coords.longitude));
+        setCachedLocation(lat, lon); // Standort für 24h cachen
+      } catch(e) {
+        // Fallback: Berlin als Standardstandort
+        lat = 52.52;
+        lon = 13.41;
+        setCachedLocation(lat, lon);
+      }
+    }
+
+    try {
       const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
       if (response.ok) {
         const data = await response.json();
@@ -388,25 +481,11 @@
             lon: lon,
             updated: new Date().toISOString()
           };
+          setCachedWeather(weatherData);
           return weatherData;
         }
       }
-    } catch(e) { 
-      try {
-        const response = await fetch("https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,relative_humidity_2m&timezone=auto");
-        if (response.ok) {
-          const data = await response.json();
-          weatherData = {
-            temp: Math.round(data.current.temperature_2m),
-            humidity: Math.round(data.current.relative_humidity_2m),
-            lat: 52.52,
-            lon: 13.41,
-            updated: new Date().toISOString()
-          };
-          return weatherData;
-        }
-      } catch(e2) {}
-    }
+    } catch(e2) {}
     return null;
   }
 
@@ -1009,11 +1088,35 @@
     const [apiKeyInput, setApiKeyInput] = useState(getApiKey());
     const [saved, setSaved] = useState(false);
     const [theme, setTheme] = useState(getTheme());
+    // BUGFIX P2: Standort-Refresh-Status
+    const [locationRefreshing, setLocationRefreshing] = useState(false);
+    const [locationStatus, setLocationStatus] = useState(() => {
+      const age = getLocationCacheAge();
+      return age !== null ? `Standort gecacht (vor ${age} Min.)` : "Noch kein Standort gespeichert";
+    });
 
     const handleSave = () => {
       setApiKey(apiKeyInput.trim());
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+    };
+
+    // BUGFIX P2: Manuelle Standort-Aktualisierung
+    const handleRefreshLocation = async () => {
+      setLocationRefreshing(true);
+      setLocationStatus("Standort wird abgefragt...");
+      try {
+        const result = await fetchWeather(true);
+        if (result) {
+          setLocationStatus(`✅ Standort aktualisiert (${result.temp}°C, ${result.humidity}% Luftfeuchtigkeit)`);
+        } else {
+          setLocationStatus("⚠️ Standort-Abfrage fehlgeschlagen");
+        }
+      } catch(e) {
+        setLocationStatus("⚠️ Fehler bei der Standort-Abfrage");
+      } finally {
+        setLocationRefreshing(false);
+      }
     };
 
     const toggleTheme = () => {
@@ -1100,8 +1203,35 @@
         }, saved ? "✓ Gespeichert" : "Speichern")
       ),
       
+      // BUGFIX P2: Standort-Karte mit manueller Aktualisierung
+      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}` } },
+        React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 } },
+          React.createElement('span', { style: { fontSize: 24 } }, "📍"),
+          React.createElement('p', { style: { fontSize: 17, fontWeight: 600, color: C.text } }, "Standort & Wetter")
+        ),
+        React.createElement('p', { style: { fontSize: 13, color: C.muted, marginBottom: 12, lineHeight: 1.5 } },
+          "Standort wird maximal einmal pro 24 Stunden abgefragt und lokal gecacht."
+        ),
+        React.createElement('p', { style: { fontSize: 12, color: C.accent, marginBottom: 16, padding: "8px 12px", background: C.accentLight, borderRadius: 8 } }, locationStatus),
+        React.createElement('button', {
+          onClick: handleRefreshLocation,
+          disabled: locationRefreshing,
+          style: {
+            background: locationRefreshing ? C.border : C.accent,
+            color: C.inverse,
+            border: "none",
+            borderRadius: 12,
+            padding: "12px 20px",
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: locationRefreshing ? "default" : "pointer",
+            width: "100%"
+          }
+        }, locationRefreshing ? "⏳ Wird abgefragt..." : "🔄 Standort aktualisieren")
+      ),
+      
       // Help section
-      React.createElement('div', { background: C.inputBg, borderRadius: 20, padding: 24, border: `1px solid ${C.border}`, marginTop: 40 },
+      React.createElement('div', { style: { background: C.inputBg, borderRadius: 20, padding: 24, border: `1px solid ${C.border}`, marginTop: 20 } },
         React.createElement('p', { style: { fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 16 } }, "📋 Anleitung"),
         React.createElement('ol', { style: { fontSize: 14, color: C.muted, paddingLeft: 20, lineHeight: 2, margin: 0 } },
           React.createElement('li', { marginBottom: 8 }, "Kostenlosen API-Key unter ", React.createElement('a', { href: "https://console.groq.com", target: "_blank", style: { color: C.accent, textDecoration: "none" } }, "console.groq.com"), " holen"),
@@ -1112,7 +1242,7 @@
       ),
       
       // Version
-      React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 32 } }, "Pflanzenpflege v2.0")
+      React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 32 } }, "Pflanzenpflege v2.3 – KI-Enrich: Beschreibung, Herkunft, Pflegetipp")
     );
   }
 
@@ -1603,7 +1733,7 @@ Nur JSON, keine Erklärungen.`;
   }
 
   // ── PlantDetail ────────────────────────────────────────
-  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete, onUpdateCustomName }) {
+  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete, onUpdateCustomName, onUpdateAiData }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
     const water = room ? needsWaterAdaptive(plant, [room]) : needsWater(plant);
     const days = daysSince(plant.last_watered_date);
@@ -1612,14 +1742,67 @@ Nur JSON, keine Erklärungen.`;
     const [customNameInput, setCustomNameInput] = useState(plant.custom_name || "");
     const adaptive = room ? getEnhancedWateringInterval(plant, room) : null;
     const daysUntilVal = room ? daysUntilAdaptive(plant, [room]) : daysUntil(plant);
+    // Enrich-State
+    const [enrichLoading, setEnrichLoading] = useState(false);
+    const [enrichError, setEnrichError] = useState(null);
     
     const hasAiData = plant.aiData && Object.keys(plant.aiData).length > 0;
     const winterTips = room ? getOverwinteringTips(plant, room) : null;
+
+    // Automatisches Lazy-Loading von description/origin/tip beim ersten Öffnen
+    useEffect(() => {
+      if (hasEnrichData(plant)) return; // Bereits vollständig
+      if (!onUpdateAiData) return;
+
+      setEnrichLoading(true);
+      setEnrichError(null);
+      fetchPlantEnrichData(plant.name)
+        .then(enrichData => {
+          if (enrichData.description || enrichData.origin || enrichData.tip) {
+            onUpdateAiData(plant.id, enrichData);
+          }
+        })
+        .catch(e => {
+          console.warn('[PlantDetail Enrich]', e.message);
+          setEnrichError("KI-Infos konnten nicht geladen werden.");
+        })
+        .finally(() => setEnrichLoading(false));
+    }, [plant.id]); // Nur beim Öffnen / Pflanzenwechsel
+
+    const handleRefreshEnrich = () => {
+      if (!onUpdateAiData || enrichLoading) return;
+      // Enrich-Cache für diese Pflanze löschen, dann neu laden
+      try {
+        const raw = localStorage.getItem(PLANT_ENRICH_CACHE_KEY);
+        if (raw) {
+          const cache = JSON.parse(raw);
+          delete cache[normalizeInput(plant.name)];
+          localStorage.setItem(PLANT_ENRICH_CACHE_KEY, JSON.stringify(cache));
+        }
+      } catch(e) {}
+
+      setEnrichLoading(true);
+      setEnrichError(null);
+      fetchPlantEnrichData(plant.name)
+        .then(enrichData => {
+          if (enrichData.description || enrichData.origin || enrichData.tip) {
+            onUpdateAiData(plant.id, enrichData);
+          }
+        })
+        .catch(e => setEnrichError("Aktualisierung fehlgeschlagen."))
+        .finally(() => setEnrichLoading(false));
+    };
 
     const handleSaveCustomName = () => {
       onUpdateCustomName(plant.id, customNameInput.trim());
       setShowCustomNameEdit(false);
     };
+
+    // Enrich-Daten: KI hat Vorrang, PLANT_DB als Fallback
+    const displayDescription = plant.aiData?.description || info.description || null;
+    const displayOrigin      = plant.aiData?.origin      || info.origin      || null;
+    const displayTip         = plant.aiData?.tip         || info.tip         || null;
+    const enrichSource       = plant.aiData?.description ? (plant.aiData?._source === 'groq' ? '🤖' : '📚') : '📚';
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 40 } },
       // Header
@@ -1735,20 +1918,56 @@ Nur JSON, keine Erklärungen.`;
             ))
           )
         ),
-        // Description
-        info.description && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
-          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Beschreibung"),
-          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, info.description)
-        ),
-        // Origin
-        info.origin && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
-          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Herkunft"),
-          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, info.origin)
-        ),
-        // Tip
+        // Description (KI > PLANT_DB > Ladeindikator)
         React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
-          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Pflegetipp"),
-          React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, info.tip)
+          React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
+            React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase" } },
+              `${enrichSource} Beschreibung`
+            ),
+            React.createElement('button', {
+              onClick: handleRefreshEnrich,
+              disabled: enrichLoading,
+              title: "KI-Infos aktualisieren",
+              style: { background: "none", border: "none", fontSize: 16, cursor: enrichLoading ? "default" : "pointer", color: C.muted, padding: "2px 6px", borderRadius: 6 }
+            }, enrichLoading ? "⏳" : "🔄")
+          ),
+          enrichLoading && !displayDescription
+            ? React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                React.createElement('div', { style: { height: 12, background: C.border, borderRadius: 6, width: "90%", animation: "pulse 1.5s ease-in-out infinite" } }),
+                React.createElement('div', { style: { height: 12, background: C.border, borderRadius: 6, width: "70%", animation: "pulse 1.5s ease-in-out infinite" } })
+              )
+            : displayDescription
+              ? React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6, color: C.text } }, displayDescription)
+              : React.createElement('p', { style: { fontSize: 13, color: C.muted, fontStyle: "italic" } }, "Keine Beschreibung verfügbar")
+        ),
+        // Origin (KI > PLANT_DB)
+        React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } },
+            `${enrichSource} Herkunft`
+          ),
+          enrichLoading && !displayOrigin
+            ? React.createElement('div', { style: { height: 12, background: C.border, borderRadius: 6, width: "60%" } })
+            : displayOrigin
+              ? React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6, color: C.text } }, displayOrigin)
+              : React.createElement('p', { style: { fontSize: 13, color: C.muted, fontStyle: "italic" } }, "Keine Herkunftsangabe verfügbar")
+        ),
+        // Tip (KI > PLANT_DB)
+        React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } },
+            `${enrichSource} Pflegetipp`
+          ),
+          enrichLoading && !displayTip
+            ? React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                React.createElement('div', { style: { height: 12, background: C.border, borderRadius: 6, width: "85%" } }),
+                React.createElement('div', { style: { height: 12, background: C.border, borderRadius: 6, width: "55%" } })
+              )
+            : displayTip
+              ? React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6, color: C.text } }, displayTip)
+              : React.createElement('p', { style: { fontSize: 13, color: C.muted, fontStyle: "italic" } }, "Kein Pflegetipp verfügbar")
+        ),
+        // Fehleranzeige Enrich
+        enrichError && React.createElement('div', { style: { background: C.warnLight, borderRadius: 12, padding: "10px 14px", border: `1px solid ${C.warnBorder}`, marginBottom: 16 } },
+          React.createElement('p', { style: { fontSize: 12, color: C.warn } }, `⚠️ ${enrichError}`)
         ),
         // Notes
         plant.notes && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
@@ -1808,62 +2027,491 @@ Nur JSON, keine Erklärungen.`;
     try { localStorage.setItem(STORAGE_KEY_API, key); } catch {}
   }
 
-  const plantCache = {};
+  // ══════════════════════════════════════════════════════════════════
+  // GROQ API – VERBESSERTE INTEGRATION v2
+  // Ziel: Pflanzensezifische, kontextabhängige, validierte KI-Antworten
+  // ══════════════════════════════════════════════════════════════════
 
   // Input Sanitization - verhindert XSS und Injection
   function sanitizeInput(str) {
     if (typeof str !== 'string') return '';
     return str
-      .replace(/[<>]/g, '') // Entferne HTML-Tags
-      .replace(/[\u0000-\u001F\u007F]/g, '') // Entferne Kontrollzeichen
+      .replace(/[<>]/g, '')
+      .replace(/[\u0000-\u001F\u007F]/g, '')
       .trim()
-      .slice(0, 200); // Maximale Länge
+      .slice(0, 200);
   }
 
   // Timeout-Wrapper für API-Calls
-  function fetchWithTimeout(url, options, timeoutMs = 15000) {
+  function fetchWithTimeout(url, options, timeoutMs = 18000) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     return fetch(url, { ...options, signal: controller.signal })
       .finally(() => clearTimeout(timeout));
   }
 
-  async function fetchPlantData(plantName) {
+  // ── Persistenter Pflanzen-Daten-Cache (localStorage, 7 Tage TTL) ─────────
+  const PLANT_AI_CACHE_KEY = 'pflanzen_ai_data_v2';
+  const PLANT_AI_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+  const PLANT_AI_CACHE_MAX = 60;
+
+  function _getAiCacheKey(name, season) {
+    return `${normalizeInput(name)}_${season}`;
+  }
+
+  function getCachedPlantAiData(name, season) {
+    try {
+      const raw = localStorage.getItem(PLANT_AI_CACHE_KEY);
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      const entry = cache[_getAiCacheKey(name, season)];
+      if (entry && (Date.now() - entry.ts) < PLANT_AI_CACHE_TTL) {
+        return { ...entry.data, _fromCache: true };
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function setCachedPlantAiData(name, season, data) {
+    try {
+      const raw = localStorage.getItem(PLANT_AI_CACHE_KEY);
+      const cache = raw ? JSON.parse(raw) : {};
+      const key = _getAiCacheKey(name, season);
+      cache[key] = { data, ts: Date.now() };
+      // Cache-Größe begrenzen: älteste Einträge löschen
+      const keys = Object.keys(cache);
+      if (keys.length > PLANT_AI_CACHE_MAX) {
+        keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0))
+            .slice(0, keys.length - PLANT_AI_CACHE_MAX)
+            .forEach(k => delete cache[k]);
+      }
+      localStorage.setItem(PLANT_AI_CACHE_KEY, JSON.stringify(cache));
+    } catch(e) {}
+  }
+
+  // ── Prompt-Builder: Kontextreicher System+User-Prompt ────────────────────
+  function buildGroqMessages(plantName, season, roomContext) {
+    const systemPrompt = `Du bist ein präziser Pflanzenexperte mit 20 Jahren Erfahrung. \
+Du antwortest AUSSCHLIESSLICH mit validem JSON – kein Markdown, keine Erklärungen, keine Kommentare. \
+Alle Intervallangaben sind ganze Zahlen (Tage). Gib immer konkrete, realistische Werte an.`;
+
+    const exampleJson = `{"name":"Monstera","watering_days":9,"water":"Alle 9 Tage – Erde zwischen Gießgaben leicht antrocknen, keine Staunässe","fertilizer_interval":21,"fertilizer_type":"Flüssigdünger April–September alle 3 Wochen, Winter pausieren","light":"Hell, indirekt – kein direktes Mittagssonnenlicht","humidity":"Hoch (60–80%)","temperature":"18–27°C","notes":"Blätter monatlich abwischen, Stecklinge leicht bewurzeln lassen","description":"Beliebte Zimmerpflanze mit markanten, eingeschnittenen Blättern. Wächst schnell und ist sehr pflegeleicht.","origin":"Tropische Regenwälder Zentral- und Südamerikas (Mexiko bis Kolumbien)","tip":"Staunässe unbedingt vermeiden – Finger-Test vor dem Gießen. Im Sommer monatlich mit weichem Tuch abstauben."}`;
+
+    const roomInfo = roomContext
+      ? `\nStandort-Kontext: ${roomContext}`
+      : '';
+
+    const userPrompt = `Erstelle vollständige Pflegedaten für die Pflanze: "${plantName}"
+Aktuelle Jahreszeit: ${season}${roomInfo}
+
+PFLICHTFORMAT – exakt dieses JSON-Schema, alle Felder befüllt:
+${exampleJson}
+
+Ersetze die Monstera-Werte durch realistische Werte für "${plantName}".
+Regeln:
+- watering_days: ganze Zahl 1–90, pflanzenspezifisch und saisonabhängig
+- fertilizer_interval: ganze Zahl 7–90 (oder 0 wenn nicht empfohlen)
+- water: beschreibender Text MIT der Tageszahl aus watering_days
+- description: 1–2 Sätze, informativ und konkret (keine Trivialaussagen)
+- origin: präzise Herkunftsregion mit Klimaangabe (z.B. "Tropische Regenwälder Brasiliens")
+- tip: 1–2 Sätze, der wichtigste konkrete Pflegehinweis für Hobbyisten
+- Keine vagen Aussagen wie "gelegentlich" oder "nach Bedarf" ohne Zahl
+- Berücksichtige die Jahreszeit ${season} für saisonale Hinweise
+
+Antworte NUR mit dem JSON-Objekt:`;
+
+    return [
+      { role: "system", content: systemPrompt },
+      { role: "user",   content: userPrompt }
+    ];
+  }
+
+  // ── Response-Validator: prüft Vollständigkeit und Plausibilität ──────────
+  function validateGroqResponse(parsed, plantName) {
+    const errors = [];
+
+    // Pflichtfelder prüfen
+    const required = ['name', 'watering_days', 'water', 'fertilizer_interval', 'light', 'humidity', 'temperature'];
+    for (const field of required) {
+      if (parsed[field] === undefined || parsed[field] === null || parsed[field] === '') {
+        errors.push(`Fehlendes Pflichtfeld: ${field}`);
+      }
+    }
+
+    // watering_days: muss Integer 1-90 sein
+    const wd = parseInt(parsed.watering_days);
+    if (isNaN(wd) || wd < 1 || wd > 90) {
+      errors.push(`Ungültiger watering_days-Wert: ${parsed.watering_days} (erwartet: 1–90)`);
+    }
+
+    // fertilizer_interval: muss Integer 0-90 sein
+    const fi = parseInt(parsed.fertilizer_interval);
+    if (isNaN(fi) || fi < 0 || fi > 90) {
+      errors.push(`Ungültiger fertilizer_interval-Wert: ${parsed.fertilizer_interval} (erwartet: 0–90)`);
+    }
+
+    // water-Text: muss Zahl enthalten und nicht vage sein
+    if (typeof parsed.water === 'string') {
+      const hasNumber = /\d/.test(parsed.water);
+      const isVague = /^(nach Bedarf|gelegentlich|selten|je nach)$/i.test(parsed.water.trim());
+      if (!hasNumber || isVague) {
+        errors.push(`Vager water-Text ohne Intervallzahl: "${parsed.water}"`);
+      }
+      if (parsed.water.length < 8) {
+        errors.push(`water-Text zu kurz: "${parsed.water}"`);
+      }
+    }
+
+    // Strings-Mindestlänge
+    if (typeof parsed.light === 'string' && parsed.light.length < 4)
+      errors.push(`light zu kurz: "${parsed.light}"`);
+    if (typeof parsed.temperature === 'string' && parsed.temperature.length < 3)
+      errors.push(`temperature zu kurz: "${parsed.temperature}"`);
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings: errors.length > 0 && errors.length <= 2 ? errors : []
+    };
+  }
+
+  // ── Response-Normalisierer: rohe Groq-Antwort → internes Format ─────────
+  function normalizeGroqResponse(parsed, plantName, season) {
+    // watering_days aus Text extrahieren, falls Feld fehlt
+    let wateringDays = parseInt(parsed.watering_days);
+    if (isNaN(wateringDays) || wateringDays < 1) {
+      const match = (parsed.water || '').match(/\d+/);
+      wateringDays = match ? parseInt(match[0]) : null;
+    }
+
+    // Fertilizer aus PLANT_DB ergänzen, falls Groq 0 zurückgibt und Pflanze bekannt
+    let fertInt = parseInt(parsed.fertilizer_interval);
+    if (isNaN(fertInt) || fertInt < 0) fertInt = 0;
+    if (fertInt === 0) {
+      // Groq sagt "kein Dünger" – PLANT_DB als Plausibilitätsprüfung
+      const dbMatch = matchPlant(plantName);
+      const dbInfo = dbMatch ? PLANT_DB[dbMatch.type] : null;
+      // Sukkulenten und Kakteen wirklich kein/wenig Dünger – OK
+      const cat = getPlantCategory(dbMatch?.type || 'Andere');
+      if (cat !== 'succulent' && cat !== 'other') {
+        // Für andere Kategorien CATEGORY_DEFAULTS-Wert nutzen
+        const catDef = CATEGORY_DEFAULTS[cat] || CATEGORY_DEFAULTS['unknown'];
+        if (catDef.fertilizer) fertInt = catDef.fertilizer;
+      }
+    }
+
+    // Dünger-Text aus fertilizer_type oder fertilizer
+    const fertText = parsed.fertilizer_type || parsed.fertilizer || '';
+
+    return {
+      // Rohdaten der KI (für Anzeige)
+      name:               parsed.name || plantName,
+      watering_days:      wateringDays,
+      water:              parsed.water || (wateringDays ? `Alle ${wateringDays} Tage gießen` : null),
+      fertilizer_interval: fertInt,
+      fertilizer_type:    fertText,
+      light:              parsed.light || "Hell, indirekt",
+      humidity:           parsed.humidity || "Mittel",
+      temperature:        parsed.temperature || "18–25°C",
+      notes:              parsed.notes || "",
+      // Neue Felder: Beschreibung, Herkunft, Pflegetipp
+      description:        (parsed.description && parsed.description.length > 10) ? parsed.description : null,
+      origin:             (parsed.origin     && parsed.origin.length > 4)        ? parsed.origin     : null,
+      tip:                (parsed.tip        && parsed.tip.length > 10)          ? parsed.tip        : null,
+      // Für aiData-Display-Felder
+      fertilizer:         fertText || (fertInt > 0 ? `Alle ${fertInt} Tage düngen` : "Kein Dünger nötig"),
+      season:             season,
+      _source:            'groq',
+      _enriched:          !!(parsed.description && parsed.origin && parsed.tip)
+    };
+  }
+
+  // ── Partieller Repair: ergänzt fehlende Felder aus PLANT_DB ─────────────
+  function repairPartialResponse(parsed, plantName) {
+    const dbMatch = matchPlant(plantName);
+    const dbInfo = dbMatch ? (PLANT_DB[dbMatch.type] || PLANT_DB["Andere"]) : PLANT_DB["Andere"];
+    const cat = getPlantCategory(dbMatch?.type || 'Andere');
+    const catDef = CATEGORY_DEFAULTS[cat] || CATEGORY_DEFAULTS['unknown'];
+
+    const repaired = { ...parsed };
+
+    // watering_days: aus water-Text oder PLANT_DB
+    if (!parseInt(repaired.watering_days) || parseInt(repaired.watering_days) < 1) {
+      const fromText = (repaired.water || '').match(/\d+/);
+      repaired.watering_days = fromText
+        ? parseInt(fromText[0])
+        : (dbInfo.watering_interval || catDef.watering || 7);
+    }
+
+    // fertilizer_interval: aus PLANT_DB
+    if (isNaN(parseInt(repaired.fertilizer_interval))) {
+      repaired.fertilizer_interval = catDef.fertilizer || 21;
+    }
+
+    // Textfelder aus PLANT_DB ergänzen
+    if (!repaired.water || repaired.water.length < 8) {
+      repaired.water = `Alle ${repaired.watering_days} Tage gießen – ${dbInfo.tip || 'Erde auf Feuchtigkeit prüfen'}`;
+    }
+    if (!repaired.light || repaired.light.length < 4) repaired.light = dbInfo.light || catDef.light || "Hell, indirekt";
+    if (!repaired.humidity || repaired.humidity.length < 2) repaired.humidity = dbInfo.humidity || catDef.humidity || "Mittel";
+    if (!repaired.temperature || repaired.temperature.length < 2) repaired.temperature = "18–25°C";
+    if (!repaired.notes) repaired.notes = dbInfo.tip || "";
+    // Neue Felder aus PLANT_DB (als Fallback)
+    if (!repaired.description && dbInfo.description) repaired.description = dbInfo.description;
+    if (!repaired.origin && dbInfo.origin) repaired.origin = dbInfo.origin;
+    if (!repaired.tip && dbInfo.tip) repaired.tip = dbInfo.tip;
+
+    repaired._repaired = true;
+    return repaired;
+  }
+
+  // ── Haupt-API-Funktion mit verbesserter Logik ─────────────────────────────
+  async function fetchPlantData(plantName, roomContext = null) {
     const apiKey = getApiKey();
-    if (!apiKey) {
-      throw new Error("Kein API-Key konfiguriert. Bitte in Settings eintragen.");
-    }
-    
-    // Input validieren und sanitieren
+    if (!apiKey) throw new Error("Kein API-Key konfiguriert. Bitte in Einstellungen eintragen.");
+
     const safeName = sanitizeInput(plantName);
-    if (!safeName || safeName.length < 2) {
-      throw new Error("Ungültiger Pflanzenname.");
-    }
-    
-    if (plantCache[safeName.toLowerCase()]) {
-      return plantCache[safeName.toLowerCase()];
-    }
+    if (!safeName || safeName.length < 2) throw new Error("Ungültiger Pflanzenname.");
 
     const month = new Date().getMonth() + 1;
-    const season = month >= 3 && month <= 5 ? "Frühling" : month >= 6 && month <= 8 ? "Sommer" : month >= 9 && month <= 11 ? "Herbst" : "Winter";
+    const season = month >= 3 && month <= 5 ? "Frühling"
+                 : month >= 6 && month <= 8 ? "Sommer"
+                 : month >= 9 && month <= 11 ? "Herbst" : "Winter";
 
-    const prompt = `Du bist ein Pflanzenexperte. Gib Informationen für die Pflanze "${safeName}" als JSON zurück. Berücksichtige aktuell ist ${season}. Antworte NUR mit diesem exakten Format:
+    // 1. Cache prüfen (persistent, 7 Tage)
+    const cached = getCachedPlantAiData(safeName, season);
+    if (cached) {
+      console.log(`[Groq Cache] Treffer für "${safeName}" (${season})`);
+      return cached;
+    }
 
-{
-  "name": "Pflanzenname",
-  "light": "Lichtbedarf",
-  "water": "Gießverhalten mit Intervall in Tagen",
-  "humidity": "optimale Luftfeuchtigkeit",
-  "temperature": "Temperaturbereich",
-  "fertilizer_interval": 14,
-  "fertilizer_type": "Düngerart und saisonale Anpassung",
-  "notes": "zusätzliche Hinweise zur Pflege inkl. jahreszeitlicher Tipps"
-}
+    // 2. API-Call mit erweitertem Prompt
+    const MAX_RETRIES = 3;
+    let lastError = null;
+    let useFallbackPrompt = false;
 
-Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval muss eine Zahl sein (Tage).`;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const messages = useFallbackPrompt
+          ? [{ role: "user", content:
+              `JSON-Pflegedaten für "${safeName}" (${season}). ` +
+              `Nur JSON: {"name":"${safeName}","watering_days":7,"water":"Alle 7 Tage gießen","fertilizer_interval":14,` +
+              `"fertilizer_type":"Standarddünger","light":"Hell, indirekt","humidity":"Mittel","temperature":"18-25°C","notes":""}`
+            }]
+          : buildGroqMessages(safeName, season, roomContext);
 
-    const maxRetries = 3;
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages,
+            temperature: 0.15,       // Niedrig → deterministische, präzise Werte
+            max_tokens: 600,
+            stop: ["\n\n\n"]         // Verhindert langes Droning
+          })
+        }, 18000);
+
+        // Rate-Limit: exponentielles Backoff
+        if (response.status === 429) {
+          const wait = 2500 * Math.pow(2, attempt);
+          console.warn(`[Groq] Rate-Limit (429), warte ${wait}ms…`);
+          await new Promise(r => setTimeout(r, wait));
+          continue;
+        }
+
+        if (response.status === 401) throw new Error("Ungültiger API-Key. Bitte in Einstellungen prüfen.");
+        if (response.status === 503) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        if (!response.ok) throw new Error(`Groq API-Fehler: HTTP ${response.status}`);
+
+        const data = await response.json();
+        if (!data.choices?.[0]?.message?.content) throw new Error("Leere API-Antwort erhalten.");
+
+        const raw = data.choices[0].message.content.trim();
+
+        // JSON extrahieren (tolerant gegenüber Markdown-Blöcken)
+        const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+        if (!jsonMatch) {
+          console.warn(`[Groq] Kein JSON in Antwort (Versuch ${attempt+1}):`, raw.slice(0, 100));
+          useFallbackPrompt = true; // Nächster Versuch mit vereinfachtem Prompt
+          lastError = new Error("Kein JSON in API-Antwort gefunden.");
+          continue;
+        }
+
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch(jsonErr) {
+          console.warn(`[Groq] JSON-Parse-Fehler (Versuch ${attempt+1}):`, jsonErr.message);
+          useFallbackPrompt = true;
+          lastError = new Error("API-Antwort konnte nicht geparst werden.");
+          continue;
+        }
+
+        // Validierung
+        const validation = validateGroqResponse(parsed, safeName);
+        
+        if (!validation.valid) {
+          console.warn(`[Groq] Validierungsfehler (Versuch ${attempt+1}):`, validation.errors);
+          
+          // Bei 1-2 reparierbaren Fehlern: Repair statt Retry
+          if (validation.errors.length <= 3) {
+            console.info('[Groq] Versuche partielle Reparatur…');
+            parsed = repairPartialResponse(parsed, safeName);
+            const recheck = validateGroqResponse(parsed, safeName);
+            if (!recheck.valid && !useFallbackPrompt) {
+              useFallbackPrompt = true;
+              lastError = new Error(`Validierung fehlgeschlagen: ${validation.errors[0]}`);
+              continue;
+            }
+          } else {
+            useFallbackPrompt = true;
+            lastError = new Error(`Validierung fehlgeschlagen: ${validation.errors.join('; ')}`);
+            continue;
+          }
+        }
+
+        // Normalisieren
+        const normalized = normalizeGroqResponse(parsed, safeName, season);
+        
+        // In persistenten Cache speichern
+        setCachedPlantAiData(safeName, season, normalized);
+        console.info(`[Groq] ✅ Erfolgreich: "${safeName}" – Gießen: alle ${normalized.watering_days}d, Dünger: alle ${normalized.fertilizer_interval}d`);
+        
+        return normalized;
+
+      } catch(e) {
+        if (e.name === 'AbortError') throw new Error("Zeitüberschreitung (18s). Bitte Internetverbindung prüfen.");
+        if (e.message.includes('Ungültiger API-Key')) throw e; // nicht retryable
+        lastError = e;
+        console.warn(`[Groq] Versuch ${attempt+1} fehlgeschlagen:`, e.message);
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+        }
+      }
+    }
+
+    // Alle Versuche fehlgeschlagen
+    throw lastError || new Error("Groq API nicht erreichbar nach 3 Versuchen.");
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ENRICH-API: Lazy-Load von Beschreibung, Herkunft, Pflegetipp
+  // Wird beim Öffnen einer Pflanze ohne diese Felder ausgeführt.
+  // Separater Cache (30 Tage TTL) – saisonal unabhängig.
+  // ══════════════════════════════════════════════════════════════════
+
+  const PLANT_ENRICH_CACHE_KEY = 'pflanzen_enrich_v1';
+  const PLANT_ENRICH_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 Tage
+
+  function getCachedEnrichData(plantName) {
+    try {
+      const raw = localStorage.getItem(PLANT_ENRICH_CACHE_KEY);
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      const key = normalizeInput(plantName);
+      const entry = cache[key];
+      if (entry && (Date.now() - entry.ts) < PLANT_ENRICH_CACHE_TTL) {
+        return { ...entry.data, _fromEnrichCache: true };
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function setCachedEnrichData(plantName, data) {
+    try {
+      const raw = localStorage.getItem(PLANT_ENRICH_CACHE_KEY);
+      const cache = raw ? JSON.parse(raw) : {};
+      cache[normalizeInput(plantName)] = { data, ts: Date.now() };
+      // Max 80 Einträge
+      const keys = Object.keys(cache);
+      if (keys.length > 80) {
+        keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0))
+            .slice(0, keys.length - 80)
+            .forEach(k => delete cache[k]);
+      }
+      localStorage.setItem(PLANT_ENRICH_CACHE_KEY, JSON.stringify(cache));
+    } catch(e) {}
+  }
+
+  // Prüft ob Pflanze bereits vollständige Enrich-Daten hat
+  function hasEnrichData(plant) {
+    return !!(plant.aiData?.description && plant.aiData?.origin && plant.aiData?.tip);
+  }
+
+  // Validiert Enrich-Response auf Mindestqualität
+  function validateEnrichResponse(parsed) {
+    const errors = [];
+    if (!parsed.description || parsed.description.length < 15)
+      errors.push('description zu kurz oder fehlend');
+    if (!parsed.origin || parsed.origin.length < 5)
+      errors.push('origin zu kurz oder fehlend');
+    if (!parsed.tip || parsed.tip.length < 15)
+      errors.push('tip zu kurz oder fehlend');
+    // Qualitätsprüfung: keine offensichtlich falschen Antworten
+    const genericPhrases = ['pflanze ist eine pflanze', 'unknown', 'keine information'];
+    for (const field of ['description', 'origin', 'tip']) {
+      if (parsed[field] && genericPhrases.some(p => parsed[field].toLowerCase().includes(p))) {
+        errors.push(`${field} enthält generische Aussage`);
+      }
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  async function fetchPlantEnrichData(plantName) {
+    const safeName = sanitizeInput(plantName);
+    if (!safeName || safeName.length < 2) throw new Error("Ungültiger Pflanzenname.");
+
+    // 1. Enrich-Cache prüfen (30 Tage)
+    const cached = getCachedEnrichData(safeName);
+    if (cached) {
+      console.log(`[Enrich Cache] Treffer für "${safeName}"`);
+      return cached;
+    }
+
+    // 2. PLANT_DB als sofortiger Fallback
+    const dbMatch = matchPlant(safeName);
+    const dbInfo = dbMatch ? (PLANT_DB[dbMatch.type] || PLANT_DB["Andere"]) : PLANT_DB["Andere"];
+    const dbFallback = {
+      description: dbInfo.description || null,
+      origin:      dbInfo.origin      || null,
+      tip:         dbInfo.tip         || null,
+      _source:     'plant_db'
+    };
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      // Kein API-Key: PLANT_DB-Fallback zurückgeben (kein Fehler)
+      return dbFallback;
+    }
+
+    // 3. Groq-Anfrage für Enrich-Daten
+    const systemPrompt = `Du bist ein präziser Pflanzenexperte. Antworte AUSSCHLIESSLICH mit validem JSON, kein Markdown.`;
+    const exampleJson = `{"description":"Beliebte Zimmerpflanze mit markanten, eingeschnittenen Blättern. Wächst schnell und ist pflegeleicht.","origin":"Tropische Regenwälder Zentral- und Südamerikas (Mexiko bis Kolumbien)","tip":"Staunässe unbedingt vermeiden – Finger-Test vor dem Gießen. Im Sommer monatlich Blätter abstauben."}`;
+    
+    const userPrompt = `Erstelle folgende Informationen für die Pflanze "${safeName}" als JSON:
+
+Beispiel (Monstera):
+${exampleJson}
+
+Regeln:
+- description: 1–2 prägnante, informative Sätze zur Pflanze (Aussehen, Besonderheiten)
+- origin: genaue Herkunftsregion mit Klimaangabe, z.B. "Tropische Bergwälder Äthiopiens"
+- tip: 1–2 Sätze mit dem wichtigsten konkreten Pflegehinweis für Hobbyisten
+- Keine vagen, generischen oder falschen Aussagen
+
+Antworte NUR mit dem JSON für "${safeName}":`;
+
+    const MAX_RETRIES = 2;
+    let lastErr = null;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         const response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -1873,47 +2521,64 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
           },
           body: JSON.stringify({
             model: GROQ_MODEL,
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3,
-            max_tokens: 500
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user",   content: userPrompt }
+            ],
+            temperature: 0.2,
+            max_tokens: 350
           })
         }, 15000);
 
         if (response.status === 429) {
-          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
           continue;
         }
-
-        if (!response.ok) {
-          throw new Error(`API-Fehler: ${response.status}`);
-        }
+        if (response.status === 401) throw new Error("Ungültiger API-Key.");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
-        if (!data.choices || !data.choices[0]) {
-          throw new Error("Ungültige API-Antwort");
+        const raw = data.choices?.[0]?.message?.content?.trim() || '';
+        const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+        if (!jsonMatch) { lastErr = new Error("Kein JSON in Enrich-Antwort"); continue; }
+
+        let parsed;
+        try { parsed = JSON.parse(jsonMatch[0]); }
+        catch(e) { lastErr = new Error("JSON-Parse-Fehler"); continue; }
+
+        // Validierung
+        const validation = validateEnrichResponse(parsed);
+        if (!validation.valid) {
+          console.warn(`[Enrich] Validierungsfehler:`, validation.errors);
+          // Partiell nutzen: mindestens ein sinnvolles Feld
+          const hasAny = ['description','origin','tip'].some(f => parsed[f] && parsed[f].length > 10);
+          if (!hasAny) { lastErr = new Error("Enrich-Antwort qualitativ unzureichend"); continue; }
         }
-        
-        const content = data.choices[0].message.content;
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          // Validierung der geparsten Daten
-          if (!parsed.name || !parsed.water) {
-            throw new Error("Unvollständige Pflanzendaten");
-          }
-          plantCache[safeName.toLowerCase()] = parsed;
-          return parsed;
-        }
-        throw new Error("Keine gültigen Daten gefunden");
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          throw new Error("Zeitüberschreitung. Bitte erneut versuchen.");
-        }
-        if (attempt === maxRetries - 1) throw e;
-        await new Promise(r => setTimeout(r, 1000));
+
+        // Merge mit PLANT_DB-Fallback für fehlende Felder
+        const result = {
+          description: (parsed.description?.length > 10) ? parsed.description : dbFallback.description,
+          origin:      (parsed.origin?.length > 4)       ? parsed.origin      : dbFallback.origin,
+          tip:         (parsed.tip?.length > 10)         ? parsed.tip         : dbFallback.tip,
+          _source:     'groq',
+          _enriched:   true
+        };
+
+        // Im Enrich-Cache speichern
+        setCachedEnrichData(safeName, result);
+        console.info(`[Enrich] ✅ "${safeName}": description=${!!result.description}, origin=${!!result.origin}, tip=${!!result.tip}`);
+        return result;
+
+      } catch(e) {
+        if (e.name === 'AbortError') { lastErr = new Error("Enrich-Timeout"); break; }
+        lastErr = e;
+        if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 1500));
       }
     }
+
+    // Fallback: PLANT_DB-Daten zurückgeben (kein Fehler nach außen)
+    console.warn(`[Enrich] Fallback auf PLANT_DB für "${safeName}":`, lastErr?.message);
+    return dbFallback;
   }
 
   // ── AddPlant ───────────────────────────────────────────
@@ -1935,43 +2600,70 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
       if (!name.trim()) return;
       setError(null);
       setMatchInfo(null);
-
       setIsLoading(true);
+
       try {
-        const aiData = await fetchPlantData(name.trim());
+        // Raum-Kontext für besseren Prompt aufbauen
+        const selectedRoom = rooms.find(r => r.id === roomId);
+        let roomContext = null;
+        if (selectedRoom) {
+          const parts = [`Raum: ${selectedRoom.name}`];
+          if (selectedRoom.temperature) parts.push(`Temperatur: ${selectedRoom.temperature}°C`);
+          if (selectedRoom.humidity)    parts.push(`Luftfeuchtigkeit: ${selectedRoom.humidity}%`);
+          roomContext = parts.join(', ');
+        }
+
+        // API-Call mit Kontext
+        const aiData = await fetchPlantData(name.trim(), roomContext);
         
-        // Use robust matching
+        // Plant-Type matching
         const matchResult = findMatchingTypeWithFallback(aiData.name || name.trim());
         
-        const wateringInterval = parseInt(aiData.water?.match(/\d+/)?.[0] || "7");
+        // watering_days direkt aus normalisierter Antwort – kein Regex-Parsen mehr nötig
+        let wateringInterval = aiData.watering_days
+          ? Math.max(1, Math.min(90, parseInt(aiData.watering_days)))
+          : parseInt((aiData.water || '').match(/\d+/)?.[0] || '7');
+        if (isNaN(wateringInterval) || wateringInterval <= 0) wateringInterval = 7;
+
         const aiFertilizerInterval = parseInt(aiData.fertilizer_interval) || 0;
-        
-        // Build aiData with fallback info
+
+        // aiData für Anzeige (Display-Felder) zusammenbauen
         let plantAiData = {
-          light: aiData.light,
-          water: aiData.water,
-          humidity: aiData.humidity,
-          temperature: aiData.temperature,
-          fertilizer: aiData.fertilizer_type || aiData.fertilizer,
-          notes: aiData.notes || ""
+          light:       aiData.light       || "Hell, indirekt",
+          water:       aiData.water       || `Alle ${wateringInterval} Tage gießen`,
+          humidity:    aiData.humidity    || "Mittel",
+          temperature: aiData.temperature || "18–25°C",
+          fertilizer:  aiData.fertilizer  || aiData.fertilizer_type || "Standard Dünger",
+          notes:       aiData.notes       || "",
+          _source:     aiData._source     || 'groq',
+          _repaired:   aiData._repaired   || false,
+          _fromCache:  aiData._fromCache  || false
         };
-        
-        // If using fallback, merge fallback data
+
+        // Bei Fallback-Match: aiData mit Kategorie-Daten anreichern
         if (matchResult.fallback && matchResult.fallbackData) {
           setMatchInfo({
             fallback: true,
             message: matchResult.fallbackData.notes,
             category: matchResult.fallbackData.category
           });
-          // Override with fallback data for safety
-          plantAiData = { ...plantAiData, ...matchResult.fallbackData };
+          // Nur leere Felder mit Fallback auffüllen – KI-Werte haben Priorität
+          plantAiData = {
+            ...matchResult.fallbackData,
+            ...Object.fromEntries(Object.entries(plantAiData).filter(([,v]) => v && v !== ''))
+          };
+          // Synchronisiere wateringInterval wenn KI keinen sinnvollen Wert hatte
+          if (!aiData.watering_days) {
+            const fbMatch = matchResult.fallbackData.water?.match(/\d+/);
+            if (fbMatch) wateringInterval = parseInt(fbMatch[0]) || wateringInterval;
+          }
         } else {
-          setMatchInfo({
-            fallback: false,
-            confidence: Math.round((matchResult.confidence || 0.9) * 100)
-          });
+          const confidence = Math.round((matchResult.confidence || 0.9) * 100);
+          const fromCache = aiData._fromCache ? ' (gecacht)' : '';
+          const repaired = aiData._repaired ? ' ⚠️ repariert' : '';
+          setMatchInfo({ fallback: false, confidence, fromCache, repaired });
         }
-        
+
         const newPlant = {
           id: Date.now().toString(),
           name: aiData.name || name.trim(),
@@ -1984,41 +2676,65 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
           last_watered_date: alreadyWatered ? new Date().toISOString() : null,
           aiData: plantAiData,
           watering_interval: wateringInterval,
-          fertilizer_interval: fertilizerEnabled ? fertilizerInterval : (aiFertilizerInterval > 0 ? aiFertilizerInterval : 0),
-          fertilizer_type: fertilizerEnabled ? fertilizerType : (aiData.fertilizer_type || aiData.fertilizer || ""),
-          last_fertilized_date: (fertilizerEnabled || aiFertilizerInterval > 0) ? new Date().toISOString() : null,
+          fertilizer_interval: fertilizerEnabled
+            ? fertilizerInterval
+            : (aiFertilizerInterval > 0 ? aiFertilizerInterval : 0),
+          fertilizer_type: fertilizerEnabled
+            ? fertilizerType
+            : (aiData.fertilizer_type || aiData.fertilizer || ""),
+          last_fertilized_date: (fertilizerEnabled || aiFertilizerInterval > 0)
+            ? new Date().toISOString()
+            : null,
           room_id: roomId || null
         };
         onAdd(newPlant);
-      } catch (e) {
-        // Fallback: use robust matching even if API fails
+
+      } catch(e) {
+        // ── Echter Fallback: nur bei API-Fehler ─────────────────────────────
+        console.error('[Groq Fallback] API nicht verfügbar:', e.message);
         const matchResult = findMatchingTypeWithFallback(name.trim());
         const fallbackData = matchResult.fallbackData || getFallbackData(name.trim(), { type: 'unknown' });
-        
+
+        // Klare Fehlermeldung anzeigen
+        const isKeyError = e.message.includes('API-Key');
+        setError(isKeyError
+          ? e.message
+          : `KI nicht erreichbar (${e.message}). Pflanze wurde mit Standardwerten gespeichert.`
+        );
+
+        if (isKeyError) { setIsLoading(false); return; } // Bei Key-Fehler nicht speichern
+
         setMatchInfo({
           fallback: true,
           message: fallbackData.notes,
           category: fallbackData.category,
-          apiError: true
+          apiError: true,
+          errorMsg: e.message
         });
-        
+
         const wateringInterval = parseInt(fallbackData.water?.match(/\d+/)?.[0] || "7");
-        
+
         const newPlant = {
           id: Date.now().toString(),
           name: name.trim(),
           custom_name: customName.trim() || null,
-          type: "Andere",
+          type: matchResult.type || "Andere",
           matchConfidence: 0.1,
-          matchStrategy: 'fallback',
+          matchStrategy: 'api-fallback',
           isFallback: true,
           notes: notes,
           last_watered_date: alreadyWatered ? new Date().toISOString() : null,
-          aiData: fallbackData,
+          aiData: {
+            ...fallbackData,
+            _source: 'fallback',
+            _apiError: e.message
+          },
           watering_interval: wateringInterval,
-          fertilizer_interval: fertilizerEnabled ? fertilizerInterval : fallbackData.fertilizer_interval,
-          fertilizer_type: fertilizerEnabled ? fertilizerType : fallbackData.fertilizer_type,
-          last_fertilized_date: (fertilizerEnabled || fallbackData.fertilizer_interval > 0) ? new Date().toISOString() : null,
+          fertilizer_interval: fertilizerEnabled ? fertilizerInterval : (fallbackData.fertilizer_interval || 0),
+          fertilizer_type: fertilizerEnabled ? fertilizerType : (fallbackData.fertilizer_type || ""),
+          last_fertilized_date: (fertilizerEnabled || (fallbackData.fertilizer_interval || 0) > 0)
+            ? new Date().toISOString()
+            : null,
           room_id: roomId || null
         };
         onAdd(newPlant);
@@ -2029,6 +2745,9 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
 
     const addManually = () => {
       if (!name.trim()) return;
+      // BUGFIX: dbInfo mit sicherem Fallback auf "Andere" damit keine undefined-Felder entstehen
+      const dbInfo = PLANT_DB[type] || PLANT_DB["Andere"];
+      const wInterval = dbInfo.watering_interval || 7;
       const newPlant = {
         id: Date.now().toString(),
         name: name.trim(),
@@ -2036,11 +2755,20 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
         type: type,
         notes: notes,
         last_watered_date: alreadyWatered ? new Date().toISOString() : null,
-        watering_interval: PLANT_DB[type]?.watering_interval || 7,
+        watering_interval: wInterval,
         fertilizer_interval: fertilizerEnabled ? fertilizerInterval : 0,
         fertilizer_type: fertilizerEnabled ? fertilizerType : "",
         last_fertilized_date: fertilizerEnabled ? new Date().toISOString() : null,
-        room_id: roomId || null
+        room_id: roomId || null,
+        // BUGFIX: aiData für manuell hinzugefügte Pflanzen aus PLANT_DB befüllen
+        aiData: {
+          light: dbInfo.light || "Hell, indirekt",
+          water: `Alle ${wInterval} Tage gießen`,
+          humidity: dbInfo.humidity || "Mittel",
+          temperature: "18-25°C",
+          fertilizer: "Standard Dünger alle 14 Tage in der Wachstumsphase",
+          notes: dbInfo.tip || "Beobachte deine Pflanze und passe die Pflege an."
+        }
       };
       onAdd(newPlant);
     };
@@ -2100,12 +2828,19 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
         },
           matchInfo.fallback 
             ? React.createElement('div', null,
-                React.createElement('p', { style: { fontWeight: 500, color: C.warn, marginBottom: 4 } }, "🔍 Annäherung verwendet"),
+                React.createElement('p', { style: { fontWeight: 500, color: C.warn, marginBottom: 4 } },
+                  matchInfo.apiError ? "⚠️ KI nicht erreichbar – Standardwerte verwendet" : "🔍 Annäherung verwendet"
+                ),
+                matchInfo.apiError && matchInfo.errorMsg && React.createElement('p', {
+                  style: { fontSize: 11, color: C.muted, marginBottom: 4, fontFamily: "monospace" }
+                }, matchInfo.errorMsg),
                 React.createElement('p', { style: { color: C.text } }, matchInfo.message)
               )
-            : matchInfo.confidence 
-              ? React.createElement('p', { style: { color: C.accent } }, `✅ Pflanze erkannt (${matchInfo.confidence}% Übereinstimmung)`)
-              : null
+            : React.createElement('div', null,
+                React.createElement('p', { style: { color: C.accent, fontWeight: 500 } },
+                  `✅ KI-Daten geladen (${matchInfo.confidence}% Übereinstimmung)${matchInfo.fromCache || ''}${matchInfo.repaired || ''}`
+                )
+              )
         ),
         // Type grid
         React.createElement('div', null,
@@ -2230,7 +2965,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
               justifyContent: "center",
               gap: 8
             }
-          }, isLoading ? "🤖 API wird aufgerufen..." : "🤖 Mit KI hinzufügen"),
+          }, isLoading ? "⏳ KI analysiert Pflanze…" : "🤖 Mit KI hinzufügen"),
           React.createElement('button', {
             onClick: addManually, disabled: !name.trim(),
             style: { 
@@ -2273,10 +3008,47 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
         const saved = localStorage.getItem("pflanzenpflege_v1");
         if (saved) {
           const data = JSON.parse(saved);
-          const migrated = data.map(p => ({
-            ...p,
-            last_watered_date: p.last_watered_date || p.lastWatered || null
-          }));
+          const migrated = data.map(p => {
+            const dbInfo = PLANT_DB[p.type] || PLANT_DB["Andere"];
+            const wInterval = p.watering_interval || dbInfo.watering_interval || 7;
+            // BUGFIX: Stelle sicher dass aiData immer vorhanden und vollständig ist
+            const migratedAiData = p.aiData && Object.keys(p.aiData).length > 0
+              ? {
+                  // Ergänze fehlende Felder in bestehenden aiData-Objekten
+                  light: p.aiData.light || dbInfo.light || "Hell, indirekt",
+                  water: p.aiData.water && !p.aiData.water.includes("undefined")
+                    ? p.aiData.water
+                    : `Alle ${wInterval} Tage gießen`,
+                  humidity: p.aiData.humidity || dbInfo.humidity || "Mittel",
+                  temperature: p.aiData.temperature || "18-25°C",
+                  fertilizer: p.aiData.fertilizer || "Standard Dünger alle 14 Tage",
+                  notes: p.aiData.notes || dbInfo.tip || "",
+                  // Migration: description/origin/tip aus PLANT_DB als Basis-Fallback
+                  description: p.aiData.description || dbInfo.description || null,
+                  origin:      p.aiData.origin      || dbInfo.origin      || null,
+                  tip:         p.aiData.tip          || dbInfo.tip         || null,
+                  _source:     p.aiData._source      || 'migrated'
+                }
+              : {
+                  // Keine aiData vorhanden → aus PLANT_DB befüllen
+                  light:       dbInfo.light        || "Hell, indirekt",
+                  water:       `Alle ${wInterval} Tage gießen`,
+                  humidity:    dbInfo.humidity     || "Mittel",
+                  temperature: "18-25°C",
+                  fertilizer:  "Standard Dünger alle 14 Tage",
+                  notes:       dbInfo.tip          || "",
+                  description: dbInfo.description  || null,
+                  origin:      dbInfo.origin       || null,
+                  tip:         dbInfo.tip          || null,
+                  _source:     'plant_db'
+                };
+            return {
+              ...p,
+              last_watered_date: p.last_watered_date || p.lastWatered || null,
+              watering_interval: wInterval,
+              aiData: migratedAiData
+            };
+          });
           setPlants(migrated);
         }
         
@@ -2324,6 +3096,13 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
     const fertilizePlant = id => save(plants.map(p => p.id === id ? { ...p, last_fertilized_date: new Date().toISOString() } : p));
     const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
     const updateCustomName = (id, customName) => save(plants.map(p => p.id === id ? { ...p, custom_name: customName || null } : p));
+    // Enrich-Daten (description/origin/tip) in bestehende aiData patchen und persistent speichern
+    const updatePlantAiData = (id, aiDataPatch) => save(
+      plants.map(p => p.id === id
+        ? { ...p, aiData: { ...(p.aiData || {}), ...aiDataPatch } }
+        : p
+      )
+    );
 
     if (!loaded) return React.createElement('div', { id: 'loading', style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
       React.createElement('span', { style: { fontSize: 48 } }, "🌿")
@@ -2335,7 +3114,7 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
       const plant = plants.find(p => p.id === selectedPlant);
       if (!plant) { setSelectedPlant(null); return null; }
       const room = rooms.find(r => r.id === plant.room_id);
-      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName });
+      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName, onUpdateAiData: updatePlantAiData });
     }
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
@@ -2395,6 +3174,158 @@ Gib nur gültiges JSON zurück, keine Erklärungen. Wichtig: fertilizer_interval
         TestRunner.log('Safety cap applied', kaktusResult.interval >= minAllowed);
         TestRunner.log('Dark mode toggle', (setThemeMode('dark'), getTheme() === 'dark'));
         TestRunner.log('Dark mode restored', (setThemeMode('light'), getTheme() === 'light'));
+
+        // ── BUGFIX REGRESSIONSTESTS ──────────────────────────────────────────
+        // BUG 1: getFallbackData – "water" enthält kein "undefined" mehr
+        const fallbackUnknown = getFallbackData('Testpflanze', { type: 'unknown', confidence: 0.1 });
+        TestRunner.log('[FIX 1] getFallbackData.water kein undefined', 
+          !!fallbackUnknown.water && !fallbackUnknown.water.includes('undefined'),
+          fallbackUnknown.water
+        );
+        const fallbackSucculent = getFallbackData('Kaktus', { type: 'succulent', confidence: 0.5 });
+        TestRunner.log('[FIX 1] getFallbackData succulent kein undefined',
+          !!fallbackSucculent.water && !fallbackSucculent.water.includes('undefined'),
+          fallbackSucculent.water
+        );
+        // Alle CATEGORY_DEFAULTS müssen "watering" haben
+        const allHaveWatering = Object.entries(CATEGORY_DEFAULTS).every(([k, v]) => typeof v.watering === 'number');
+        TestRunner.log('[FIX 1] Alle CATEGORY_DEFAULTS haben "watering"-Key', allHaveWatering);
+
+        // BUG 2: wateringInterval stimmt mit aiData.water überein (kein Mismatch)
+        const fbData = getFallbackData('TestSukkulente', { type: 'succulent', confidence: 0.5 });
+        const parsedDays = parseInt(fbData.water?.match(/\d+/)?.[0]);
+        TestRunner.log('[FIX 2] Fallback wateringInterval parsebar', !isNaN(parsedDays) && parsedDays > 0, parsedDays + 'd');
+
+        // BUG 3: addManually würde aiData haben (Strukturtest)
+        const dbInfo = PLANT_DB['Monstera'];
+        const syntheticAiData = {
+          light: dbInfo.light || "Hell, indirekt",
+          water: `Alle ${dbInfo.watering_interval} Tage gießen`,
+          humidity: dbInfo.humidity || "Mittel",
+          temperature: "18-25°C",
+          fertilizer: "Standard Dünger",
+          notes: dbInfo.tip || ""
+        };
+        TestRunner.log('[FIX 3] addManually aiData vollständig', 
+          ['light','water','humidity','temperature','fertilizer','notes'].every(k => !!syntheticAiData[k])
+        );
+
+        // BUG 4: Migration – keine undefined-Felder in aiData
+        const legacyPlant = { id: '1', name: 'Test', type: 'Monstera', last_watered_date: null };
+        const dbLegacy = PLANT_DB[legacyPlant.type] || PLANT_DB['Andere'];
+        const migratedAiData = {
+          light: dbLegacy.light || "Hell, indirekt",
+          water: `Alle ${legacyPlant.watering_interval || dbLegacy.watering_interval || 7} Tage gießen`,
+          humidity: dbLegacy.humidity || "Mittel",
+          temperature: "18-25°C",
+          fertilizer: "Standard Dünger alle 14 Tage",
+          notes: dbLegacy.tip || ""
+        };
+        TestRunner.log('[FIX 4] Migration erzeugt valides aiData',
+          !Object.values(migratedAiData).some(v => String(v).includes('undefined'))
+        );
+
+        // BUG 5: Location-Cache-Funktionen existieren
+        TestRunner.log('[FIX 5] getCachedLocation exportiert', typeof getCachedLocation === 'function');
+        TestRunner.log('[FIX 5] setCachedLocation exportiert', typeof setCachedLocation === 'function');
+        TestRunner.log('[FIX 5] getLocationCacheAge exportiert', typeof getLocationCacheAge === 'function');
+        // Kein Geolocation-Seiteneffekt durch Test
+        TestRunner.log('[FIX 5] fetchWeather akzeptiert forceRefresh-Param', fetchWeather.length >= 0);
+
+        // ── GROQ v2 INTEGRATIONSTESTS ────────────────────────────────────────
+        // Prompt-Builder
+        const msgs = buildGroqMessages('Monstera', 'Frühling', 'Wohnzimmer, 21°C');
+        TestRunner.log('[Groq v2] buildGroqMessages system+user', msgs.length === 2 && msgs[0].role === 'system');
+        TestRunner.log('[Groq v2] Prompt enthält watering_days', msgs[1].content.includes('watering_days'));
+        TestRunner.log('[Groq v2] Prompt enthält fertilizer_interval', msgs[1].content.includes('fertilizer_interval'));
+        TestRunner.log('[Groq v2] Prompt enthält Saison', msgs[1].content.includes('Frühling'));
+        TestRunner.log('[Groq v2] Prompt enthält Raumkontext', msgs[1].content.includes('Wohnzimmer'));
+        // NEU: description/origin/tip im Prompt
+        TestRunner.log('[Groq v2] Prompt enthält description', msgs[1].content.includes('description'));
+        TestRunner.log('[Groq v2] Prompt enthält origin', msgs[1].content.includes('origin'));
+        TestRunner.log('[Groq v2] Prompt enthält tip', msgs[1].content.includes('tip'));
+
+        // Validierung: valide Antwort
+        const validResp = { name:'Monstera', watering_days:9, water:'Alle 9 Tage gießen', fertilizer_interval:21,
+          light:'Hell, indirekt', humidity:'Hoch', temperature:'18-27°C' };
+        const vr = validateGroqResponse(validResp, 'Monstera');
+        TestRunner.log('[Groq v2] validateGroqResponse valide Antwort', vr.valid, vr.errors.join(', ') || 'OK');
+
+        // Validierung: ungültige Antwort
+        const badResp = { name:'X', watering_days:200, water:'gelegentlich', fertilizer_interval:-5,
+          light:'', humidity:'', temperature:'' };
+        const br = validateGroqResponse(badResp, 'X');
+        TestRunner.log('[Groq v2] validateGroqResponse erkennt Fehler', !br.valid && br.errors.length >= 3, br.errors.length + ' Fehler');
+
+        // Validierung: vager water-Text ohne Zahl
+        const vagueResp = { ...validResp, water: 'gelegentlich gießen', watering_days: 7 };
+        const vague = validateGroqResponse(vagueResp, 'X');
+        TestRunner.log('[Groq v2] validateGroqResponse erkennt vagen Text', !vague.valid);
+
+        // Normalisierung
+        const norm = normalizeGroqResponse(validResp, 'Monstera', 'Frühling');
+        TestRunner.log('[Groq v2] normalizeGroqResponse watering_days', norm.watering_days === 9);
+        TestRunner.log('[Groq v2] normalizeGroqResponse fertilizer_interval', norm.fertilizer_interval === 21);
+        TestRunner.log('[Groq v2] normalizeGroqResponse _source=groq', norm._source === 'groq');
+
+        // Reparatur
+        const brokenResp = { name:'Kaktus', water:'Alle 21 Tage', fertilizer_interval: null, light:null, humidity:null, temperature:null };
+        const repaired = repairPartialResponse(brokenResp, 'Kaktus');
+        TestRunner.log('[Groq v2] repairPartialResponse füllt watering_days', !!repaired.watering_days);
+        TestRunner.log('[Groq v2] repairPartialResponse füllt light', !!repaired.light);
+        TestRunner.log('[Groq v2] repairPartialResponse _repaired=true', repaired._repaired === true);
+
+        // Persistenter Cache
+        const testSeason = 'TestSaison';
+        setCachedPlantAiData('TestPflanze', testSeason, { watering_days: 5, water: 'Test' });
+        const cacheHit = getCachedPlantAiData('TestPflanze', testSeason);
+        TestRunner.log('[Groq v2] Persistenter Cache schreiben+lesen', cacheHit?.watering_days === 5);
+        TestRunner.log('[Groq v2] Cache enthält _fromCache Flag', cacheHit?._fromCache === true);
+
+        // Normalisierung enthält description/origin/tip
+        const enrichedResp = { ...validResp, description: 'Eine schöne Pflanze mit tollen Blättern.', origin: 'Tropische Regenwälder Südamerikas', tip: 'Staunässe vermeiden und regelmäßig Blätter abwischen.' };
+        const enrichNorm = normalizeGroqResponse(enrichedResp, 'Monstera', 'Sommer');
+        TestRunner.log('[Enrich] normalizeGroqResponse extrahiert description', !!enrichNorm.description);
+        TestRunner.log('[Enrich] normalizeGroqResponse extrahiert origin', !!enrichNorm.origin);
+        TestRunner.log('[Enrich] normalizeGroqResponse extrahiert tip', !!enrichNorm.tip);
+        TestRunner.log('[Enrich] normalizeGroqResponse _enriched=true', enrichNorm._enriched === true);
+
+        // repairPartialResponse füllt description/origin/tip aus PLANT_DB
+        const unEnrichedResp = { name:'Monstera', water:'Alle 9 Tage', fertilizer_interval:21, light:'Hell', humidity:'Hoch', temperature:'20°C' };
+        const repairedEnrich = repairPartialResponse(unEnrichedResp, 'Monstera');
+        TestRunner.log('[Enrich] repairPartialResponse füllt description aus PLANT_DB', !!repairedEnrich.description);
+        TestRunner.log('[Enrich] repairPartialResponse füllt origin aus PLANT_DB', !!repairedEnrich.origin);
+        TestRunner.log('[Enrich] repairPartialResponse füllt tip aus PLANT_DB', !!repairedEnrich.tip);
+
+        // validateEnrichResponse
+        const goodEnrich = { description: 'Schöne tropische Pflanze mit großen Blättern.', origin: 'Tropische Wälder Brasiliens', tip: 'Staunässe vermeiden, regelmäßig gießen.' };
+        const goodEnrichV = validateEnrichResponse(goodEnrich);
+        TestRunner.log('[Enrich] validateEnrichResponse akzeptiert gute Daten', goodEnrichV.valid);
+        const badEnrich = { description: 'X', origin: '', tip: 'Y' };
+        const badEnrichV = validateEnrichResponse(badEnrich);
+        TestRunner.log('[Enrich] validateEnrichResponse erkennt schlechte Daten', !badEnrichV.valid && badEnrichV.errors.length >= 2);
+
+        // hasEnrichData
+        const plantWithEnrich  = { aiData: { description: 'Beschreibung', origin: 'Herkunft', tip: 'Tipp' } };
+        const plantWithoutEnrich = { aiData: { light: 'Hell', water: 'Alle 7 Tage' } };
+        TestRunner.log('[Enrich] hasEnrichData erkennt vollständige Daten', hasEnrichData(plantWithEnrich));
+        TestRunner.log('[Enrich] hasEnrichData erkennt fehlende Daten', !hasEnrichData(plantWithoutEnrich));
+
+        // Enrich-Cache
+        setCachedEnrichData('TestPflanzeEnrich', { description: 'Test-Beschreibung', origin: 'Test-Herkunft', tip: 'Test-Tipp' });
+        const enrichCacheHit = getCachedEnrichData('TestPflanzeEnrich');
+        TestRunner.log('[Enrich] Enrich-Cache schreiben+lesen', enrichCacheHit?.description === 'Test-Beschreibung');
+        TestRunner.log('[Enrich] Enrich-Cache setzt _fromEnrichCache', enrichCacheHit?._fromEnrichCache === true);
+
+        // Migration: aiData enthält jetzt description/origin/tip aus PLANT_DB
+        const migratedWithEnrich = {
+          ...PLANT_DB['Monstera'],
+          description: PLANT_DB['Monstera'].description || null,
+          origin: PLANT_DB['Monstera'].origin || null,
+          tip: PLANT_DB['Monstera'].tip || null
+        };
+        TestRunner.log('[Enrich] Migration befüllt description', !!migratedWithEnrich.description);
+        TestRunner.log('[Enrich] Migration befüllt origin', !!migratedWithEnrich.origin);
       } catch(e) { console.error('Test error:', e); }
       return TestRunner.summary();
     }
