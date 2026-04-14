@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pflanzen" />
   <meta name="theme-color" id="theme-meta" content="#FAFBFC" />
-  <title>Pflanzenpflege</title>
+  <title>Pflanzenpflege v2.4</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
@@ -37,6 +37,16 @@
 
   <script>
   const { useState, useEffect, useCallback } = React;
+
+  // ── Globale Konstanten (müssen vor allen anderen Deklarationen stehen) ─────
+  const MS_PER_DAY         = 86_400_000;  // 1 Tag in Millisekunden
+  const NAV_HEIGHT_PX      = 80;          // Höhe der Bottom-Navigation
+  const MAX_CACHE_AI       = 60;          // Max. AI-Cache-Einträge
+  const MAX_CACHE_ENRICH   = 80;          // Max. Enrich-Cache-Einträge
+  const TTL_AI_DAYS        = 7;           // AI-Cache Gültigkeitsdauer (Tage)
+  const TTL_ENRICH_DAYS    = 30;          // Enrich-Cache Gültigkeitsdauer (Tage)
+  const TTL_WEATHER_HOURS  = 24;          // Wetter-Cache Gültigkeitsdauer (Stunden)
+  const TTL_DISCOVER_HOURS = 24;          // Discover-Cache Gültigkeitsdauer (Stunden)
 
   const PLANT_DB = {
     "Monstera":     { icon: "🌿", watering_interval: 9,  light: "Hell, indirekt",   tip: "Die Erde sollte zwischendurch gut antrocknen. Staunässe unbedingt vermeiden.", humidity: "Hoch",    difficulty: "Einfach", description: "Bekannt für ihre großen, gefensterten Blätter.", origin: "Zentral- und Südamerika" },
@@ -87,7 +97,7 @@
     "Spuckpalme": ["spuckpalme", "sperrblume", "streptocarpus"],
     "Gummibaum": ["gummibaum", "gummibaum", "ficus elastica", "rubber plant"],
     "Thymian": ["thymian", "thyme", "echter thymian"],
-    "Minze": ["minze", "mint", " Pfefferminze", "spearmint"],
+    "Minze": ["minze", "mint", "pfefferminze", "spearmint"],
     "Friedenslilie": ["friedenslilie", "peace lily", "spathiphyllum"],
     "Drachenbaum": ["drachenbaum", "dracaena", "dragon tree"],
     "Bogenhanf": ["bogenhanf", "sansevieria", "schwiegermutterzunge", "snake plant"],
@@ -371,7 +381,7 @@
 
   let weatherData = null;
   const WEATHER_CACHE_KEY = 'pflanzen_weather_cache';
-  const WEATHER_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  const WEATHER_CACHE_DURATION = TTL_WEATHER_HOURS * 60 * 60 * 1000;
   // BUGFIX P2: Separater Location-Cache – trennt "Standort wurde abgefragt" von "Wetter wurde geladen"
   const LOCATION_CACHE_KEY = 'pflanzen_location_cache';
   
@@ -530,7 +540,7 @@
     try {
       const date = new Date(d);
       if (isNaN(date.getTime())) return null;
-      return Math.floor((Date.now() - date.getTime()) / 86400000);
+      return Math.floor((Date.now() - date.getTime()) / MS_PER_DAY);
     } catch { return null; }
   }
   function needsWater(p) {
@@ -866,6 +876,7 @@
     }
   };
 
+
   function getOverwinteringTips(plant, room) {
     const season = getCurrentSeason();
     const location = getLocationFromRoom(room);
@@ -900,78 +911,6 @@
     return status;
   }
 
-  // Fallback für Kompatibilität
-  function getAdaptiveWateringInterval(plant, room) {
-    if (!plant || !plant.type) {
-      return { interval: 7, reasons: [], baseInterval: 7 };
-    }
-    
-    const baseInterval = Math.max(1, plant.watering_interval || PLANT_DB[plant.type]?.watering_interval || 7);
-    
-    if (!room || (room.temperature === null && room.humidity === null)) {
-      return { interval: baseInterval, reasons: [], baseInterval };
-    }
-    
-    let adjustedInterval = baseInterval;
-    let adjustmentReason = [];
-    
-    // Temperatur-Anpassung (sicher mit null-checks)
-    const temp = typeof room.temperature === 'number' ? room.temperature : null;
-    if (temp !== null && !isNaN(temp)) {
-      if (temp >= 28) {
-        adjustedInterval = Math.max(1, Math.floor(baseInterval * 0.5));
-        adjustmentReason.push("sehr warm");
-      } else if (temp >= 25) {
-        adjustedInterval = Math.max(1, Math.floor(baseInterval * 0.7));
-        adjustmentReason.push("warm");
-      } else if (temp >= 22) {
-        adjustedInterval = Math.max(1, Math.floor(baseInterval * 0.85));
-        adjustmentReason.push("mäßig warm");
-      } else if (temp <= 8) {
-        adjustedInterval = Math.floor(baseInterval * 1.7);
-        adjustmentReason.push("kalt");
-      } else if (temp <= 12) {
-        adjustedInterval = Math.floor(baseInterval * 1.4);
-        adjustmentReason.push("kühl");
-      } else if (temp <= 15) {
-        adjustedInterval = Math.floor(baseInterval * 1.2);
-        adjustmentReason.push("frisch");
-      }
-    }
-    
-    // Luftfeuchtigkeits-Anpassung (sicher mit null-checks)
-    const humidity = typeof room.humidity === 'number' ? room.humidity : null;
-    if (humidity !== null && !isNaN(humidity)) {
-      if (humidity <= 25) {
-        adjustedInterval = Math.max(1, Math.floor(adjustedInterval * 0.5));
-        adjustmentReason.push("sehr trocken");
-      } else if (humidity <= 35) {
-        adjustedInterval = Math.max(1, Math.floor(adjustedInterval * 0.7));
-        adjustmentReason.push("trocken");
-      } else if (humidity <= 45) {
-        adjustedInterval = Math.max(1, Math.floor(adjustedInterval * 0.85));
-        adjustmentReason.push("gering feucht");
-      } else if (humidity >= 85) {
-        adjustedInterval = Math.floor(adjustedInterval * 1.7);
-        adjustmentReason.push("sehr feucht");
-      } else if (humidity >= 75) {
-        adjustedInterval = Math.floor(adjustedInterval * 1.4);
-        adjustmentReason.push("feucht");
-      } else if (humidity >= 65) {
-        adjustedInterval = Math.floor(adjustedInterval * 1.2);
-        adjustmentReason.push("mäßig feucht");
-      }
-    }
-    
-    const finalInterval = Math.max(1, Math.round(adjustedInterval));
-    
-    return {
-      interval: finalInterval,
-      reasons: adjustmentReason,
-      baseInterval: baseInterval,
-      wasAdjusted: finalInterval !== baseInterval
-    };
-  }
 
   function needsWaterAdaptive(plant, rooms) {
     if (!plant || !plant.type) return false;
@@ -1128,15 +1067,15 @@
 
     const inputStyle = { width: "100%", background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", fontSize: 14, color: C.text, outline: "none", WebkitAppearance: "none" };
 
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100, background: C.bg, minHeight: "100vh" } },
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))", background: C.bg, minHeight: "100vh" } },
       React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8, color: C.text } }, "Einstellungen"),
       React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 32 } }, "Konfiguriere deine App"),
       
       // Theme Toggle
-      React.createElement('div', { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" },
+      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" } },
         React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
           React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12 } },
-            React.createElement('span', { fontSize: 24 }, theme === "dark" ? "🌙" : "☀️"),
+            React.createElement('span', { style: { fontSize: 24 } }, theme === "dark" ? "🌙" : "☀️"),
             React.createElement('div', null,
               React.createElement('p', { style: { fontSize: 17, fontWeight: 600, color: C.text } }, "Design"),
               React.createElement('p', { style: { fontSize: 13, color: C.muted } }, theme === "dark" ? "Dunkel aktiv" : "Hell aktiv")
@@ -1173,9 +1112,9 @@
       ),
       
       // API Key section
-      React.createElement('div', { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" },
+      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" } },
         React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16 } },
-          React.createElement('span', { fontSize: 24 }, "🔑"),
+          React.createElement('span', { style: { fontSize: 24 } }, "🔑"),
           React.createElement('p', { style: { fontSize: 17, fontWeight: 600, color: C.text } }, "Groq API-Key")
         ),
         React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 1.6 } }, "Trage deinen API-Key ein, um automatische Pflanzendaten von der KI zu erhalten."),
@@ -1242,7 +1181,7 @@
       ),
       
       // Version
-      React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 32 } }, "Pflanzenpflege v2.3 – KI-Enrich: Beschreibung, Herkunft, Pflegetipp")
+      React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 32 } }, "Pflanzenpflege v2.4 – Optimiert: Caching, Mobile UX, Bugfixes")
     );
   }
 
@@ -1278,8 +1217,7 @@
 
     const roomPlants = (roomId) => (plants || []).filter(p => p.room_id === roomId);
 
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100 } },
-      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8 } }, "Räume"),
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))" } },
       React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Pflanzen nach Räumen organisieren"),
       
       // Weather info
@@ -1287,12 +1225,12 @@
         React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.accent, marginBottom: 8 } }, "🌤️ Außenklima (Live)"),
         React.createElement('div', { style: { display: "flex", gap: 20 } },
           React.createElement('div', null,
-            React.createElement('span', { fontSize: 24 }, "🌡️"),
+            React.createElement('span', { style: { fontSize: 24 } }, "🌡️"),
             React.createElement('p', { style: { fontSize: 20, fontWeight: 600, color: C.text } }, `${weather?.temp}°C`),
             React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Außentemperatur")
           ),
           React.createElement('div', null,
-            React.createElement('span', { fontSize: 24 }, "💧"),
+            React.createElement('span', { style: { fontSize: 24 } }, "💧"),
             React.createElement('p', { style: { fontSize: 20, fontWeight: 600, color: C.text } }, `${weather?.humidity}%`),
             React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Luftfeuchtigkeit")
           )
@@ -1346,7 +1284,7 @@
               React.createElement('div', null,
                 React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
                   React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12 } },
-                    React.createElement('span', { fontSize: 28 }, room.icon),
+                    React.createElement('span', { style: { fontSize: 28 } }, room.icon),
                     React.createElement('div', null,
                       React.createElement('p', { style: { fontSize: 16, fontWeight: 600 } }, room.name),
                       React.createElement('p', { style: { fontSize: 12, color: C.muted } }, `${rPlants.length} Pflanz${rPlants.length === 1 ? "e" : "en"}`)
@@ -1383,10 +1321,10 @@
                           cursor: "pointer"
                         }
                       },
-                        React.createElement('span', { fontSize: 20 }, PLANT_DB[p.type]?.icon || "🌱"),
-                        React.createElement('div', { flex: 1 },
-                          React.createElement('p', { fontSize: 13, fontWeight: 500 }, getDisplayName(p)),
-                          issues.length > 0 && React.createElement('p', { fontSize: 11, color: C.warn }, issues[0])
+                        React.createElement('span', { style: { fontSize: 20 } }, PLANT_DB[p.type]?.icon || "🌱"),
+                        React.createElement('div', { style: { flex: 1 } },
+                          React.createElement('p', { style: { fontSize: 13, fontWeight: 500 } }, getDisplayName(p)),
+                          issues.length > 0 && React.createElement('p', { style: { fontSize: 11, color: C.warn } }, issues[0])
                         )
                       );
                     })
@@ -1422,6 +1360,32 @@
     )
   }
 
+  // ── DiscoverView – Cache (localStorage, 24h TTL) ──────────
+  const DISCOVER_CACHE_KEY = 'pflanzen_discover_v1';
+  const DISCOVER_CACHE_TTL = TTL_DISCOVER_HOURS * 60 * 60 * 1000;
+
+  function getCachedDiscoverData(categoryId) {
+    try {
+      const raw = localStorage.getItem(DISCOVER_CACHE_KEY);
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      const entry = cache[categoryId];
+      if (entry && (Date.now() - entry.ts) < DISCOVER_CACHE_TTL) {
+        return entry.data;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function setCachedDiscoverData(categoryId, data) {
+    try {
+      const raw = localStorage.getItem(DISCOVER_CACHE_KEY);
+      const cache = raw ? JSON.parse(raw) : {};
+      cache[categoryId] = { data, ts: Date.now() };
+      localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify(cache));
+    } catch(e) {}
+  }
+
   // ── DiscoverView ─────────────────────────────────────────
   function DiscoverView() {
     const categories = [
@@ -1434,15 +1398,31 @@
     const [activeCategory, setActiveCategory] = useState(null);
     const [recommendations, setRecommendations] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [fromCache, setFromCache] = useState(false);
 
     const fetchRecommendations = async (category) => {
+      // Toggle: gleiche Kategorie nochmal klicken schließt sie
       if (activeCategory === category && recommendations) {
         setActiveCategory(null);
         setRecommendations(null);
+        setFromCache(false);
         return;
       }
-      
+      // Doppelklick-Schutz
+      if (loading) return;
+
       setActiveCategory(category);
+      setFromCache(false);
+
+      // 1. Cache prüfen (24h)
+      const cached = getCachedDiscoverData(category);
+      if (cached) {
+        console.log(`[Discover Cache] Treffer für "${category}"`);
+        setRecommendations(cached);
+        setFromCache(true);
+        return;
+      }
+
       setLoading(true);
       
       try {
@@ -1470,7 +1450,7 @@ Nur JSON, keine Erklärungen.`;
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              model: "llama-3.1-8b-instant",
+              model: GROQ_MODEL,
               messages: [{ role: "user", content: prompt }],
               temperature: 0.3,
               max_tokens: 800
@@ -1485,6 +1465,17 @@ Nur JSON, keine Erklärungen.`;
           throw e;
         }
         
+        if (response.status === 429) {
+          setRecommendations({ error: "Zu viele Anfragen. Bitte kurz warten und erneut versuchen." });
+          setLoading(false);
+          return;
+        }
+        if (response.status === 401) {
+          setRecommendations({ error: "Ungültiger API-Key. Bitte in Einstellungen prüfen." });
+          setLoading(false);
+          return;
+        }
+
         if (response.ok) {
           const data = await response.json();
           if (!data.choices || !data.choices[0]) {
@@ -1496,6 +1487,8 @@ Nur JSON, keine Erklärungen.`;
               try {
                 const parsed = JSON.parse(jsonMatch[0]);
                 if (Array.isArray(parsed) && parsed.length > 0) {
+                  // Im Cache speichern
+                  setCachedDiscoverData(category, parsed);
                   setRecommendations(parsed);
                 } else {
                   setRecommendations({ error: "Keine Ergebnisse gefunden" });
@@ -1517,8 +1510,7 @@ Nur JSON, keine Erklärungen.`;
       setLoading(false);
     };
 
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 100 } },
-      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8 } }, "Entdecken"),
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))" } },
       React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Finde die perfekte Pflanze für dich"),
       
       // Categories
@@ -1545,20 +1537,22 @@ Nur JSON, keine Erklärungen.`;
       
       // Results
       loading && React.createElement('div', { style: { textAlign: "center", padding: 40 } },
-        React.createElement('span', { fontSize: 32 }, "⏳"),
+        React.createElement('span', { style: { fontSize: 32 } }, "⏳"),
         React.createElement('p', { style: { fontSize: 14, color: C.muted, marginTop: 12 } }, "Lade Empfehlungen...")
       ),
       
       recommendations && !recommendations.error && React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
-        React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 } }, "Empfehlungen"),
+        React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 } },
+          fromCache ? "Empfehlungen (gecacht)" : "Empfehlungen"
+        ),
         recommendations.map((rec, i) =>
           React.createElement('div', {
             key: i,
             style: { background: C.card, borderRadius: 16, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }
           },
             React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 8 } },
-              React.createElement('span', { fontSize: 24 }, "🌿"),
-              React.createElement('p', { fontSize: 16, fontWeight: 600 }, rec.name)
+              React.createElement('span', { style: { fontSize: 24 } }, "🌿"),
+              React.createElement('p', { style: { fontSize: 16, fontWeight: 600 } }, rec.name)
             ),
             rec.reason && React.createElement('p', { style: { fontSize: 13, color: C.muted, marginBottom: 6 } }, rec.reason),
             rec.care && React.createElement('p', { style: { fontSize: 12, color: C.accent, background: C.accentLight, padding: "8px 12px", borderRadius: 8 } }, "💡 " + rec.care)
@@ -1577,7 +1571,7 @@ Nur JSON, keine Erklärungen.`;
     const thirsty = plants.filter(p => needsWaterAdaptive(p, rooms));
     const upcoming = plants.filter(p => !needsWaterAdaptive(p, rooms)).sort((a, b) => daysUntilAdaptive(a, rooms) - daysUntilAdaptive(b, rooms)).slice(0, 4);
 
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px calc(90px + env(safe-area-inset-bottom, 0px))`, maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('p', { style: { fontSize: 12, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 } },
         new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })
       ),
@@ -1700,7 +1694,7 @@ Nur JSON, keine Erklärungen.`;
 
   // ── PlantsView ─────────────────────────────────────────
   function PlantsView({ plants, rooms, onSelect, onAdd }) {
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px 16px`, maxWidth: 430, margin: "0 auto" } },
+    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px calc(90px + env(safe-area-inset-bottom, 0px))`, maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 } },
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Meine Pflanzen"),
         React.createElement('button', { onClick: onAdd, style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Neu")
@@ -1804,7 +1798,7 @@ Nur JSON, keine Erklärungen.`;
     const displayTip         = plant.aiData?.tip         || info.tip         || null;
     const enrichSource       = plant.aiData?.description ? (plant.aiData?._source === 'groq' ? '🤖' : '📚') : '📚';
 
-    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 40 } },
+    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))" } },
       // Header
       React.createElement('div', { style: { background: water ? C.warnLight : C.accentLight, padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 28px`, borderBottom: `1px solid ${C.border}` } },
         React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0, color: C.text } }, "←"),
@@ -1848,7 +1842,7 @@ Nur JSON, keine Erklärungen.`;
               adaptive && React.createElement('div', { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 } },
                 React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `📅 ${adaptive.season}`),
                 React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `📍 ${LOCATION_TRANSLATIONS[adaptive.location] || adaptive.location}`),
-                adaptive && React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `🌡️ ${CLIMATE_TRANSLATIONS[adaptive.climate] || adaptive.climate}`)
+                React.createElement('span', { style: { fontSize: 10, background: C.card, color: C.muted, padding: "3px 8px", borderRadius: 6 } }, `🌡️ ${CLIMATE_TRANSLATIONS[adaptive.climate] || adaptive.climate}`)
               )
             ),
             React.createElement('button', { onClick: () => onWater(plant.id), style: { background: "none", color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: 12, padding: "10px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer" } }, "💧 Gießen")
@@ -2052,8 +2046,8 @@ Nur JSON, keine Erklärungen.`;
 
   // ── Persistenter Pflanzen-Daten-Cache (localStorage, 7 Tage TTL) ─────────
   const PLANT_AI_CACHE_KEY = 'pflanzen_ai_data_v2';
-  const PLANT_AI_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
-  const PLANT_AI_CACHE_MAX = 60;
+  const PLANT_AI_CACHE_TTL = TTL_AI_DAYS * MS_PER_DAY;
+  const PLANT_AI_CACHE_MAX = MAX_CACHE_AI;
 
   function _getAiCacheKey(name, season) {
     return `${normalizeInput(name)}_${season}`;
@@ -2408,7 +2402,7 @@ Antworte NUR mit dem JSON-Objekt:`;
   // ══════════════════════════════════════════════════════════════════
 
   const PLANT_ENRICH_CACHE_KEY = 'pflanzen_enrich_v1';
-  const PLANT_ENRICH_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 Tage
+  const PLANT_ENRICH_CACHE_TTL = TTL_ENRICH_DAYS * MS_PER_DAY;
 
   function getCachedEnrichData(plantName) {
     try {
@@ -2487,7 +2481,8 @@ Antworte NUR mit dem JSON-Objekt:`;
 
     const apiKey = getApiKey();
     if (!apiKey) {
-      // Kein API-Key: PLANT_DB-Fallback zurückgeben (kein Fehler)
+      // Kein API-Key: PLANT_DB-Fallback cachen und zurückgeben (kein Fehler, kein erneuter Aufruf)
+      setCachedEnrichData(safeName, dbFallback);
       return dbFallback;
     }
 
@@ -2773,14 +2768,6 @@ Antworte NUR mit dem JSON für "${safeName}":`;
       onAdd(newPlant);
     };
 
-    function findMatchingType(plantName) {
-      const lower = plantName.toLowerCase();
-      for (const [key, val] of Object.entries(PLANT_DB)) {
-        if (lower.includes(key.toLowerCase())) return key;
-      }
-      return "Andere";
-    }
-
     const inputStyle = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", fontSize: 15, color: C.text, outline: "none", WebkitAppearance: "none" };
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
@@ -2788,7 +2775,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
         React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0, color: C.text } }, "←"),
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Neue Pflanze")
       ),
-      React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: 40 } },
+      React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))" } },
         // Name with AI indicator
         React.createElement('div', null,
           React.createElement(Label, null, "Name der Pflanze"),
@@ -2908,7 +2895,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
               onClick: () => setFertilizerEnabled(!fertilizerEnabled)
             }, fertilizerEnabled ? "✓" : "")
           ),
-          fertilizerEnabled && React.createElement('div', { display: "flex", flexDirection: "column", gap: 12 },
+          fertilizerEnabled && React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
             React.createElement('div', null,
               React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Intervall (Tage)"),
               React.createElement('input', { 
@@ -3117,7 +3104,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
       return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName, onUpdateAiData: updatePlantAiData });
     }
 
-    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
+    return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       view === "home" && React.createElement(HomeView, { plants, rooms, onWater: waterPlant, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
       view === "plants" && React.createElement(PlantsView, { plants, rooms, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
       view === "rooms" && React.createElement(RoomView, { 
