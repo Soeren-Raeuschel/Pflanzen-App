@@ -1009,14 +1009,19 @@
           borderRadius: "50%", 
           width: 48, 
           height: 48, 
+          minWidth: 48,        /* ← verhindert flex-Kompression */
+          flexShrink: 0,       /* ← kein Stauchen durch Flex-Container */
+          aspectRatio: "1 / 1", /* ← garantiert immer perfekter Kreis */
           fontSize: 24, 
+          lineHeight: 1,       /* ← Texthöhe neutralisieren */
           cursor: "pointer", 
           display: "flex", 
           alignItems: "center", 
           justifyContent: "center", 
           boxShadow: "0 4px 12px rgba(61,107,79,0.3)", 
           color: C.inverse,
-          marginTop: -8
+          marginTop: -8,
+          padding: 0            /* ← kein asymmetrisches Padding */
         }
       }, "＋")
     );
@@ -1727,13 +1732,14 @@ Nur JSON, keine Erklärungen.`;
   }
 
   // ── PlantDetail ────────────────────────────────────────
-  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete, onUpdateCustomName, onUpdateAiData }) {
+  function PlantDetail({ plant, room, rooms = [], onBack, onWater, onFertilize, onDelete, onUpdateCustomName, onUpdateAiData, onMoveRoom }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
     const water = room ? needsWaterAdaptive(plant, [room]) : needsWater(plant);
     const days = daysSince(plant.last_watered_date);
     const [showDelete, setShowDelete] = useState(false);
     const [showCustomNameEdit, setShowCustomNameEdit] = useState(false);
     const [customNameInput, setCustomNameInput] = useState(plant.custom_name || "");
+    const [showMoveRoom, setShowMoveRoom] = useState(false);
     const adaptive = room ? getEnhancedWateringInterval(plant, room) : null;
     const daysUntilVal = room ? daysUntilAdaptive(plant, [room]) : daysUntil(plant);
     // Enrich-State
@@ -1820,7 +1826,50 @@ Nur JSON, keine Erklärungen.`;
             React.createElement('button', { 
               onClick: () => setShowCustomNameEdit(true), 
               style: { background: "none", border: "none", fontSize: 12, color: C.muted, marginTop: 4, cursor: "pointer", textDecoration: "underline" } 
-            }, plant.custom_name ? "Name ändern" : "Eigenen Namen hinzufügen")
+            }, plant.custom_name ? "Name ändern" : "Eigenen Namen hinzufügen"),
+          // ── Raum-Zuordnung ───────────────────────────────────────
+          !showMoveRoom ?
+            React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" } },
+              React.createElement('span', { style: { fontSize: 13, color: C.muted } },
+                room ? `📍 ${room.icon} ${room.name}` : "📍 Kein Raum"
+              ),
+              onMoveRoom && rooms.length > 0 && React.createElement('button', {
+                onClick: () => setShowMoveRoom(true),
+                style: { background: "none", border: "none", fontSize: 12, color: C.accent, cursor: "pointer", textDecoration: "underline", padding: 0 }
+              }, "Raum ändern")
+            ) :
+            React.createElement('div', { style: { marginTop: 10, background: "rgba(0,0,0,0.1)", borderRadius: 14, padding: "12px 14px" } },
+              React.createElement('p', { style: { fontSize: 11, fontWeight: 500, color: C.muted, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 8 } }, "Raum auswählen"),
+              React.createElement('div', { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+                React.createElement('button', {
+                  onClick: () => { onMoveRoom && onMoveRoom(plant.id, null); setShowMoveRoom(false); },
+                  style: {
+                    padding: "6px 12px", borderRadius: 8,
+                    border: !plant.room_id ? `1.5px solid ${C.accent}` : `1px solid rgba(0,0,0,0.18)`,
+                    background: !plant.room_id ? C.accent : "rgba(255,255,255,0.3)",
+                    cursor: "pointer", fontSize: 12,
+                    color: !plant.room_id ? C.inverse : C.text
+                  }
+                }, "Kein Raum"),
+                ...rooms.map(r =>
+                  React.createElement('button', {
+                    key: r.id,
+                    onClick: () => { onMoveRoom && onMoveRoom(plant.id, r.id); setShowMoveRoom(false); },
+                    style: {
+                      padding: "6px 12px", borderRadius: 8,
+                      border: plant.room_id === r.id ? `1.5px solid ${C.accent}` : `1px solid rgba(0,0,0,0.18)`,
+                      background: plant.room_id === r.id ? C.accent : "rgba(255,255,255,0.3)",
+                      cursor: "pointer", fontSize: 12,
+                      color: plant.room_id === r.id ? C.inverse : C.text
+                    }
+                  }, `${r.icon} ${r.name}`)
+                )
+              ),
+              React.createElement('button', {
+                onClick: () => setShowMoveRoom(false),
+                style: { marginTop: 8, background: "none", border: "none", fontSize: 12, color: C.muted, cursor: "pointer", padding: 0 }
+              }, "✕ Abbrechen")
+            )
         )
       ),
       React.createElement('div', { style: { padding: "24px 20px" } },
@@ -3083,6 +3132,8 @@ Antworte NUR mit dem JSON für "${safeName}":`;
     const fertilizePlant = id => save(plants.map(p => p.id === id ? { ...p, last_fertilized_date: new Date().toISOString() } : p));
     const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
     const updateCustomName = (id, customName) => save(plants.map(p => p.id === id ? { ...p, custom_name: customName || null } : p));
+    // Pflanze in einen anderen Raum verschieben (alle anderen Daten bleiben unverändert)
+    const moveToRoom = (id, roomId) => save(plants.map(p => p.id === id ? { ...p, room_id: roomId || null } : p));
     // Enrich-Daten (description/origin/tip) in bestehende aiData patchen und persistent speichern
     const updatePlantAiData = (id, aiDataPatch) => save(
       plants.map(p => p.id === id
@@ -3101,7 +3152,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
       const plant = plants.find(p => p.id === selectedPlant);
       if (!plant) { setSelectedPlant(null); return null; }
       const room = rooms.find(r => r.id === plant.room_id);
-      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName, onUpdateAiData: updatePlantAiData });
+      return React.createElement(PlantDetail, { plant, room, rooms, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName, onUpdateAiData: updatePlantAiData, onMoveRoom: moveToRoom });
     }
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
