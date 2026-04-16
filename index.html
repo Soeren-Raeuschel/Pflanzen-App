@@ -540,7 +540,14 @@
     try {
       const date = new Date(d);
       if (isNaN(date.getTime())) return null;
-      return Math.floor((Date.now() - date.getTime()) / MS_PER_DAY);
+      // Kalender-Tage: Mitternacht-normalisiert in lokaler Zeit
+      // Verhindert Sprünge durch Uhrzeiten, DST und Timezonen-Offset
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      const dateMidnight = new Date(date);
+      dateMidnight.setHours(0, 0, 0, 0);
+      const diff = todayMidnight.getTime() - dateMidnight.getTime();
+      return diff < 0 ? 0 : Math.round(diff / MS_PER_DAY);
     } catch { return null; }
   }
   function needsWater(p) {
@@ -1603,7 +1610,9 @@ Nur JSON, keine Erklärungen.`;
                   React.createElement('div', { style: { flex: 1 } },
                     React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, getDisplayName(p)),
                     React.createElement('p', { style: { fontSize: 12, color: C.warn } }, 
-                      d === null ? "Noch nie gegossen" : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`
+                      d === null ? "Noch nie gegossen"
+                        : d === 0  ? "Heute fällig – noch nicht gegossen"
+                        : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`
                     ),
                     adaptive &&                     React.createElement('div', { style: { display: "flex", gap: 4, marginTop: 4 } },
                       React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, adaptive.season),
@@ -1635,7 +1644,9 @@ Nur JSON, keine Erklärungen.`;
             React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
               upcoming.map(p => {
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
-                const d = daysUntilAdaptive(p, rooms);
+                const dUntil = daysUntilAdaptive(p, rooms);
+                // daysSince für den sichtbaren Tage-Counter (zählt ab letztem Gießen hoch)
+                const dSince = daysSince(p.last_watered_date);
                 const room = rooms.find(r => r.id === p.room_id);
                 const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
                 return React.createElement('div', {
@@ -1649,10 +1660,14 @@ Nur JSON, keine Erklärungen.`;
                     React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } },
                       React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type),
                       adaptive && React.createElement('span', { style: { fontSize: 9, background: C.accentLight, color: C.accent, padding: "2px 5px", borderRadius: 4 } }, `${adaptive.interval}d`)
-                    )
+                    ),
+                    // Sichtbarer Tage-Counter: zählt ab letztem Gießen hoch
+                    dSince !== null && dSince > 0 && React.createElement('p', {
+                      style: { fontSize: 11, color: C.muted, marginTop: 3 }
+                    }, `Seit ${dSince} Tag${dSince !== 1 ? "en" : ""} nicht gegossen`)
                   ),
                   React.createElement('span', { style: { fontSize: 12, color: C.accent, background: C.accentLight, padding: "4px 10px", borderRadius: 8, fontWeight: 500 } },
-                    `in ${d} Tag${d !== 1 ? "en" : ""}`
+                    `in ${dUntil} Tag${dUntil !== 1 ? "en" : ""}`
                   )
                 );
               })
@@ -2144,6 +2159,15 @@ Alle Intervallangaben sind ganze Zahlen (Tage). Gib immer konkrete, realistische
       ? `\nStandort-Kontext: ${roomContext}`
       : '';
 
+    // Saisonale Dünge-Richtwerte für den Prompt
+    const fertilizerSeasonHint = season === "Winter"
+      ? "Im Winter Düngen meist PAUSIEREN oder stark reduzieren (fertilizer_interval mind. 60–90 Tage, außer Kakteen/Sukkulenten: 0)."
+      : season === "Sommer"
+      ? "Im Sommer Wachstumsphase: kürzere Dünge-Intervalle (10–21 Tage je nach Art)."
+      : season === "Frühling"
+      ? "Im Frühling Wachstumsbeginn: moderate Intervalle (14–28 Tage)."
+      : "Im Herbst Wachstum nachlassend: reduzierte Dünge-Intervalle (28–42 Tage).";
+
     const userPrompt = `Erstelle vollständige Pflegedaten für die Pflanze: "${plantName}"
 Aktuelle Jahreszeit: ${season}${roomInfo}
 
@@ -2153,7 +2177,15 @@ ${exampleJson}
 Ersetze die Monstera-Werte durch realistische Werte für "${plantName}".
 Regeln:
 - watering_days: ganze Zahl 1–90, pflanzenspezifisch und saisonabhängig
-- fertilizer_interval: ganze Zahl 7–90 (oder 0 wenn nicht empfohlen)
+- fertilizer_interval: ganze Zahl 7–90 (oder 0 NUR für Kakteen/Sukkulenten im Winter)
+  Pflichtregeln für fertilizer_interval:
+  * Tropengewächse, Zimmerpflanzen, Kräuter: NIEMALS 0 – immer 7–42
+  * Sukkulenten, Kakteen: im Sommer 28–42, im Winter 0 erlaubt
+  * ${fertilizerSeasonHint}
+- fertilizer_type: KONKRETE Beschreibung mit Produkttyp UND Zeitraum, z.B.:
+  "Flüssigdünger alle 14 Tage April–September, Oktober–März pausieren"
+  "NPK-Volldünger alle 3 Wochen März–August, im Herbst/Winter pausieren"
+  VERBOTEN: vage Aussagen wie "regelmäßig düngen", "nach Bedarf", "gelegentlich"
 - water: beschreibender Text MIT der Tageszahl aus watering_days
 - description: 1–2 Sätze, informativ und konkret (keine Trivialaussagen)
 - origin: präzise Herkunftsregion mit Klimaangabe (z.B. "Tropische Regenwälder Brasiliens")
@@ -2191,6 +2223,16 @@ Antworte NUR mit dem JSON-Objekt:`;
     const fi = parseInt(parsed.fertilizer_interval);
     if (isNaN(fi) || fi < 0 || fi > 90) {
       errors.push(`Ungültiger fertilizer_interval-Wert: ${parsed.fertilizer_interval} (erwartet: 0–90)`);
+    }
+
+    // fertilizer_type: darf nicht vage sein, muss Zeitangabe enthalten
+    if (typeof parsed.fertilizer_type === 'string' && parsed.fertilizer_type.length > 0) {
+      const fertText = parsed.fertilizer_type.toLowerCase();
+      const isVagueFert = /^(regelmäßig|gelegentlich|nach bedarf|bei bedarf|ab und zu|manchmal)/.test(fertText);
+      const hasTimeRef = /\d|wochen?|monat|tage?|jährlich|frühling|sommer|herbst|winter|april|mai|juni|juli|august|sept|okt|nov|dez|januar|februar|märz|pausier/i.test(parsed.fertilizer_type);
+      if (isVagueFert || !hasTimeRef) {
+        errors.push(`Vager fertilizer_type ohne Zeitangabe: "${parsed.fertilizer_type}"`);
+      }
     }
 
     // water-Text: muss Zahl enthalten und nicht vage sein
@@ -2243,8 +2285,15 @@ Antworte NUR mit dem JSON-Objekt:`;
       }
     }
 
-    // Dünger-Text aus fertilizer_type oder fertilizer
-    const fertText = parsed.fertilizer_type || parsed.fertilizer || '';
+    // Dünger-Text aus fertilizer_type oder fertilizer – Fallback generieren wenn vage
+    const rawFertText = parsed.fertilizer_type || parsed.fertilizer || '';
+    const fertTextIsVague = rawFertText.length < 8
+      || /^(regelmäßig|gelegentlich|nach bedarf|bei bedarf)$/i.test(rawFertText.trim());
+    const fertText = (!fertTextIsVague && rawFertText)
+      ? rawFertText
+      : fertInt > 0
+        ? `Alle ${fertInt} Tage düngen – in Wachstumsphase (${season === 'Winter' ? 'im Winter pausieren' : 'Frühjahr bis Herbst'})`
+        : "Kein Dünger erforderlich";
 
     return {
       // Rohdaten der KI (für Anzeige)
