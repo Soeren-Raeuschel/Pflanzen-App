@@ -8,23 +8,117 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pflanzen" />
   <meta name="theme-color" id="theme-meta" content="#FAFBFC" />
-  <title>Pflanzenpflege v2.4</title>
+  <title>Pflanzenpflege v3</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; background: #FAFBFC; font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif; color: #1A1A1A; overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
-    html.dark, body.dark { background: #0F172A; color: #E2E8F0; }
-    input, select, textarea, button { font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif; }
+    html, body {
+      height: 100%;
+      background: #F4F8F5;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #1B3328;
+      overscroll-behavior: none;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    html.dark, body.dark { background: #0C1F15; color: #D4EDD8; }
+    input, select, textarea, button { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
     ::-webkit-scrollbar { display: none; }
     #root { height: 100%; }
     .safe-top { padding-top: env(safe-area-inset-top, 20px); }
     .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     button { -webkit-appearance: none; }
     input { -webkit-appearance: none; }
+
+    /* ── Keyframes ── */
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50%       { opacity: 0.4; }
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ripple {
+      from { transform: scale(0.96); opacity: 0.7; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+    .card-enter { animation: fadeSlideUp 0.25s ease forwards; }
+    .btn-tap:active { animation: ripple 0.12s ease; }
+
+    /* ── Botanical texture overlay on bg ── */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 110% -10%, rgba(82,183,136,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at -10% 110%, rgba(45,106,79,0.06) 0%, transparent 60%);
+    }
+    #root { position: relative; z-index: 1; }
+
+    /* ── ProgressRing smooth transition */
+    .ring-track { transition: stroke-dasharray 0.7s cubic-bezier(.4,0,.2,1); }
+
+    /* ── Watering Ripple */
+    @keyframes waterRipple {
+      0%   { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+    @keyframes checkPop {
+      0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+      60%  { transform: scale(1.25) rotate(4deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .ripple-ring {
+      position: absolute; inset: 0; border-radius: 50%;
+      border: 2px solid currentColor;
+      animation: waterRipple 0.6s ease-out forwards;
+      pointer-events: none;
+    }
+
+    /* ── Staggered Card Entrance */
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(14px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .card-stagger { animation: cardIn 0.28s ease both; }
+
+    /* ── Confetti Celebration */
+    @keyframes confettiFall {
+      0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+      100% { transform: translateY(80px)  rotate(360deg); opacity: 0; }
+    }
+    .confetti-piece {
+      position: absolute; width: 8px; height: 8px; border-radius: 2px;
+      animation: confettiFall 0.9s ease-in forwards;
+      pointer-events: none;
+    }
+
+    /* ── Floating Plant Emoji */
+    @keyframes floatEmoji {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-9px); }
+    }
+    .plant-float { animation: floatEmoji 3s ease-in-out infinite; display: inline-block; }
+
+    /* ── Urgency Pulse for critically overdue plants */
+    @keyframes urgencyPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(180,83,9,0.0); }
+      50%       { box-shadow: 0 0 0 6px rgba(180,83,9,0.18); }
+    }
+    .urgent-pulse { animation: urgencyPulse 1.8s ease-in-out infinite; }
+
+    /* ── Button press feel */
+    button:active { transform: scale(0.96); }
+
+    /* ── Respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .card-stagger, .plant-float, .urgent-pulse, .ring-track { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
@@ -303,51 +397,67 @@
   }
 
   const C_LIGHT = {
-    bg: "#FAFBFC", 
-    card: "#FFFFFF", 
-    text: "#1A1A1A", 
-    muted: "#9CA3AF",
-    accent: "#10B981", 
-    accentLight: "#D1FAE5",
-    warn: "#F59E0B", 
-    warnLight: "#FEF3C7", 
-    border: "#E5E7EB",
-    success: "#10B981",
-    info: "#3B82F6",
-    inverse: "#FFFFFF",
-    inputBg: "#F9F9F9",
-    navBg: "#FFFFFF",
-    cardBorder: "1px solid #E5E7EB",
-    warm: "#B77B00",
-    warmLight: "#FEF3E2",
-    warnBorder: "#f5d8cc",
-    danger: "#DC2626",
-    dangerLight: "#FEF2F2",
-    dangerBorder: "#FECACA",
+    // ── 60% Backgrounds (botanisch getönt, kein reines Weiß/Grau)
+    bg:         "#F4F8F5",      // Haupthintergrund: warm-grünes Off-White
+    card:       "#FFFFFF",      // Karten: reines Weiß für Kontrast
+    inputBg:    "#EEF4F0",      // Input-Felder: leicht getöntes Grün
+    navBg:      "#FFFFFF",      // Nav: sauber
+    // ── Typografie-Hierarchie (4 Ebenen via Grautöne, grün getönt)
+    text:       "#1B3328",      // Primärtext: tief, botanisch-dunkelgrün
+    textSecond: "#3D6654",      // Sekundärtext: mittleres Grün
+    muted:      "#6B8C7A",      // Gedämpft: besser lesbar als #9CA3AF
+    subtle:     "#9DBFAD",      // Sehr schwach: für Metainfos
+    // ── 10% Akzent (sparsam!)
+    accent:     "#2D6A4F",      // Primär-CTA: Waldgrün (nicht #10B981 Neon)
+    accentLight:"#D8F3DC",      // Akzent-Hintergrund: frisches Mint
+    accentMid:  "#52B788",      // Hover-/Zwischen-Grün
+    // ── Semantisch
+    warn:       "#B45309",      // Amber: gedämpft, nicht Neon
+    warnLight:  "#FEF3C7",
+    warnBorder: "#FDE68A",
+    warm:       "#92400E",      // Braun-warm für Dünger
+    warmLight:  "#FEF3E2",
+    success:    "#2D6A4F",
+    info:       "#1D4ED8",
+    danger:     "#B91C1C",
+    dangerLight:"#FEF2F2",
+    dangerBorder:"#FECACA",
+    // ── Struktur
+    border:     "#C8DDD1",      // Border: grün getönt (nicht neutral-grau)
+    cardBorder: "1px solid #C8DDD1",
+    inverse:    "#FFFFFF",
   };
 
   const C_DARK = {
-    bg: "#0F172A", 
-    card: "#1E293B", 
-    text: "#E2E8F0", 
-    muted: "#94A3B8",
-    accent: "#10B981", 
-    accentLight: "#064E3B",
-    warn: "#F59E0B", 
-    warnLight: "#451A03", 
-    border: "#334155",
-    success: "#10B981",
-    info: "#3B82F6",
-    inverse: "#000000",
-    inputBg: "#334155",
-    navBg: "#1E293B",
-    cardBorder: "1px solid rgba(255,255,255,0.1)",
-    warm: "#D97706",
-    warmLight: "#451A03",
+    // ── Backgrounds
+    bg:         "#0C1F15",      // Tiefer Wald-Schwarz (kein neutrales Navy!)
+    card:       "#132B1C",      // Karten: leicht aufgehellt
+    inputBg:    "#1A3826",      // Inputs: etwas heller
+    navBg:      "#0E2419",      // Nav: dunkelster Ton
+    // ── Typografie-Hierarchie
+    text:       "#D4EDD8",      // Primär: leicht mint-getönt (kein reines Weiß)
+    textSecond: "#98C4A4",      // Sekundär
+    muted:      "#6B9A77",      // Gedämpft
+    subtle:     "#3D5E47",      // Sehr schwach
+    // ── 10% Akzent
+    accent:     "#52B788",      // Helles Grün für Dark Mode (gut lesbar)
+    accentLight:"#0A2517",      // Akzent-Hintergrund: sehr dunkel
+    accentMid:  "#2D6A4F",
+    // ── Semantisch
+    warn:       "#D97706",
+    warnLight:  "#2D1900",
     warnBorder: "#78350F",
-    danger: "#DC2626",
-    dangerLight: "#450A0A",
-    dangerBorder: "#7F1D1D",
+    warm:       "#D97706",
+    warmLight:  "#2D1500",
+    success:    "#52B788",
+    info:       "#60A5FA",
+    danger:     "#F87171",
+    dangerLight:"#2D0A0A",
+    dangerBorder:"#7F1D1D",
+    // ── Struktur
+    border:     "#1E4030",      // Border: grün getönt
+    cardBorder: "1px solid rgba(82,183,136,0.12)",
+    inverse:    "#0C1F15",
   };
 
   const DEFAULT_ROOMS = [
@@ -944,8 +1054,106 @@
   // ── Label ──────────────────────────────────────────────
   function Label({ children }) {
     return React.createElement('p', {
-      style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }
+      style: { fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }
     }, children);
+  }
+
+  // ── ProgressRing (Animation #1) ─────────────────────────
+  // Zeigt wie nah der nächste Gießtermin ist: 0%=frisch, 100%=überfällig
+  // Farbe: grün → amber → rot
+  function ProgressRing({ daysUntil, interval, size = 38 }) {
+    const r = (size - 7) / 2;
+    const circ = 2 * Math.PI * r;
+    // pct = wie viel des Intervalls ist verbraucht (0=frisch, 1=genau fällig, >1=überfällig)
+    const pct = (interval <= 0) ? 0 : Math.max(0, Math.min(1.05, (interval - (daysUntil || 0)) / interval));
+    const overdue = daysUntil !== null && daysUntil <= 0;
+    const color = overdue
+      ? C.warn
+      : pct > 0.8
+        ? "#D97706"    // amber für "bald"
+        : C.accent;
+    const bg = overdue
+      ? C.warnLight
+      : pct > 0.8
+        ? "#FEF3C7"
+        : C.accentLight;
+    const dash = circ * Math.min(pct, 1);
+    return React.createElement('svg', {
+      width: size, height: size,
+      viewBox: `0 0 ${size} ${size}`,
+      style: { transform: "rotate(-90deg)", flexShrink: 0 }
+    },
+      // Track (Hintergrundring)
+      React.createElement('circle', { cx: size/2, cy: size/2, r, fill: "none", stroke: bg, strokeWidth: 3.5 }),
+      // Fortschrittsring
+      React.createElement('circle', {
+        cx: size/2, cy: size/2, r, fill: "none",
+        stroke: color, strokeWidth: 3.5,
+        strokeDasharray: `${dash} ${circ}`,
+        strokeLinecap: "round",
+        className: "ring-track"
+      })
+    );
+  }
+
+  // ── CountUpNumber (Animation #7) ──────────────────────────
+  // Zählt bei Mount von 0 auf den Zielwert hoch
+  function CountUpNumber({ target }) {
+    const [display, setDisplay] = useState(0);
+    useEffect(() => {
+      if (!target || target === 0) { setDisplay(0); return; }
+      let start = 0;
+      const dur = Math.min(800, target * 80);
+      const step = dur / target;
+      const timer = setInterval(() => {
+        start += 1;
+        setDisplay(start);
+        if (start >= target) clearInterval(timer);
+      }, step);
+      return () => clearInterval(timer);
+    }, [target]);
+    return React.createElement('p', { style: { fontSize: 24, fontWeight: 600, color: C.text } }, display);
+  }
+
+  // ── WaterRipple (Animation #2) ───────────────────────────
+  // Expandierende Ringe beim Gießen – als Feedback für den Tap
+  function WaterRipple({ color }) {
+    return React.createElement('span', {
+      className: "ripple-ring",
+      style: { color }
+    });
+  }
+
+  // ── Confetti (Animation #4) ──────────────────────────────
+  // Kurze Feierkonfetti wenn alle Pflanzen gegossen wurden
+  function ConfettiCelebration() {
+    const colors = [C.accent, C.accentMid || "#52B788", "#D97706", "#60A5FA", "#EC4899", "#34D399"];
+    const pieces = Array.from({ length: 18 }, (_, i) => ({
+      id: i,
+      color: colors[i % colors.length],
+      left: 10 + (i * 5.2) % 80,
+      delay: (i * 0.045).toFixed(2),
+      size: 6 + (i % 3) * 3
+    }));
+    return React.createElement('div', {
+      style: { position: "relative", height: 0, overflow: "visible", pointerEvents: "none" }
+    },
+      ...pieces.map(p =>
+        React.createElement('div', {
+          key: p.id,
+          className: "confetti-piece",
+          style: {
+            left: `${p.left}%`,
+            top: 0,
+            width: p.size,
+            height: p.size,
+            background: p.color,
+            animationDelay:`${p.delay}s`,
+            borderRadius: p.id % 2 === 0 ? "50%" : "2px"
+          }
+        })
+      )
+    );
   }
 
   // ── BottomNav ──────────────────────────────────────────
@@ -967,12 +1175,12 @@
         width: "100%", 
         maxWidth: 430, 
         background: C.navBg || C.card,
-        boxShadow: "0 -2px 20px rgba(0,0,0,0.1)",
-        borderTop: `1px solid ${C.border}`, 
+        borderTop: `1px solid ${C.border}`,
+        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", 
         display: "flex", 
         alignItems: "center", 
         justifyContent: "space-between", 
-        padding: `8px 16px calc(8px + env(safe-area-inset-bottom, 0px))`, 
+        padding: `6px 12px calc(6px + env(safe-area-inset-bottom, 0px))`, 
         zIndex: 100 
       }
     },
@@ -1000,7 +1208,7 @@
             React.createElement('span', { 
               style: { 
                 fontSize: 10, 
-                fontWeight: 500, 
+                fontWeight: active === tab.id ? 600 : 400, 
                 color: active === tab.id ? C.accent : C.muted,
                 whiteSpace: "nowrap"
               }
@@ -1080,11 +1288,11 @@
     const inputStyle = { width: "100%", background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", fontSize: 14, color: C.text, outline: "none", WebkitAppearance: "none" };
 
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))", background: C.bg, minHeight: "100vh" } },
-      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, marginBottom: 8, color: C.text } }, "Einstellungen"),
-      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 32 } }, "Konfiguriere deine App"),
+      React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 40, fontWeight: 400, marginBottom: 6, color: C.text, lineHeight: 1.05, letterSpacing: "-0.01em" } }, "Einstellungen"),
+      React.createElement('p', { style: { fontSize: 15, color: C.muted, marginBottom: 32, lineHeight: 1.6 } }, "Konfiguriere deine App"),
       
       // Theme Toggle
-      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" } },
+      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}` } },
         React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
           React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12 } },
             React.createElement('span', { style: { fontSize: 24 } }, theme === "dark" ? "🌙" : "☀️"),
@@ -1124,7 +1332,7 @@
       ),
       
       // API Key section
-      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}`, boxShadow: getTheme() === "dark" ? "0 2px 12px rgba(255,255,255,0.05)" : "0 2px 12px rgba(0,0,0,0.04)" } },
+      React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: 24, marginBottom: 20, border: `1px solid ${C.border}` } },
         React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16 } },
           React.createElement('span', { style: { fontSize: 24 } }, "🔑"),
           React.createElement('p', { style: { fontSize: 17, fontWeight: 600, color: C.text } }, "Groq API-Key")
@@ -1193,7 +1401,7 @@
       ),
       
       // Version
-      React.createElement('p', { style: { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 32 } }, "Pflanzenpflege v2.4 – Optimiert: Caching, Mobile UX, Bugfixes")
+      React.createElement('p', { style: { fontSize: 12, color: C.subtle || C.muted, textAlign: "center", marginTop: 32, fontStyle: "italic" } }, "Pflanzenpflege v3.0 · Redesign")
     );
   }
 
@@ -1230,10 +1438,13 @@
     const roomPlants = (roomId) => (plants || []).filter(p => p.room_id === roomId);
 
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))" } },
-      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Pflanzen nach Räumen organisieren"),
+      React.createElement('div', { style: { paddingTop: 8, marginBottom: 28 } },
+        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 40, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-0.01em", marginBottom: 6 } }, "Meine Räume"),
+        React.createElement('p', { style: { fontSize: 14, color: C.muted, lineHeight: 1.6 } }, "Pflanzen nach Räumen organisieren")
+      ),
       
       // Weather info
-      weather && React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, border: `1px solid ${C.accent}` } },
+      weather && React.createElement('div', { style: { background: `linear-gradient(135deg, ${C.accentLight} 0%, ${C.card} 100%)`, borderRadius: 16, padding: "16px", marginBottom: 20, border: `1px solid ${C.border}` } },
         React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.accent, marginBottom: 8 } }, "🌤️ Außenklima (Live)"),
         React.createElement('div', { style: { display: "flex", gap: 20 } },
           React.createElement('div', null,
@@ -1255,7 +1466,7 @@
           const rPlants = roomPlants(room.id);
           const isEditing = editingRoom === room.id;
           
-          return React.createElement('div', { key: room.id, style: { background: C.card, borderRadius: 20, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" } },
+          return React.createElement('div', { key: room.id, style: { background: C.card, borderRadius: 20, padding: 20, border: `1px solid ${C.border}` } },
             isEditing ?
               React.createElement('div', null,
                 React.createElement('div', { style: { marginBottom: 16 } },
@@ -1523,7 +1734,10 @@ Nur JSON, keine Erklärungen.`;
     };
 
     return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: "calc(90px + env(safe-area-inset-bottom, 0px))" } },
-      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Finde die perfekte Pflanze für dich"),
+      React.createElement('div', { style: { paddingTop: 8, marginBottom: 28 } },
+        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 40, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-0.01em", marginBottom: 6 } }, "Entdecken"),
+        React.createElement('p', { style: { fontSize: 14, color: C.muted, lineHeight: 1.6 } }, "Finde die perfekte Pflanze für dich")
+      ),
       
       // Categories
       React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 } },
@@ -1534,6 +1748,7 @@ Nur JSON, keine Erklärungen.`;
             style: {
               background: activeCategory === cat.id ? C.accent : C.card,
               border: `1px solid ${activeCategory === cat.id ? C.accent : C.border}`,
+              transition: "background 0.15s ease, border-color 0.15s ease",
               borderRadius: 16,
               padding: 20,
               cursor: "pointer",
@@ -1554,13 +1769,13 @@ Nur JSON, keine Erklärungen.`;
       ),
       
       recommendations && !recommendations.error && React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
-        React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 } },
+        React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 } },
           fromCache ? "Empfehlungen (gecacht)" : "Empfehlungen"
         ),
         recommendations.map((rec, i) =>
           React.createElement('div', {
             key: i,
-            style: { background: C.card, borderRadius: 16, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }
+            style: { background: C.card, borderRadius: 16, padding: 20, border: `1px solid ${C.border}` }
           },
             React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 8 } },
               React.createElement('span', { style: { fontSize: 24 } }, "🌿"),
@@ -1583,7 +1798,7 @@ Nur JSON, keine Erklärungen.`;
     const thirsty = plants.filter(p => needsWaterAdaptive(p, rooms));
     const upcoming = plants.filter(p => !needsWaterAdaptive(p, rooms)).sort((a, b) => daysUntilAdaptive(a, rooms) - daysUntilAdaptive(b, rooms)).slice(0, 4);
 
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px calc(90px + env(safe-area-inset-bottom, 0px))`, maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
+    return React.createElement('div', { className: 'card-enter', style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px calc(90px + env(safe-area-inset-bottom, 0px))`, maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('p', { style: { fontSize: 12, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 } },
         new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })
       ),
@@ -1594,7 +1809,7 @@ Nur JSON, keine Erklärungen.`;
         React.createElement(React.Fragment, null,
           // Thirsty section
           thirsty.length > 0 && React.createElement('div', { style: { marginBottom: 28 } },
-            React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.warn, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, `Heute gießen (${thirsty.length})`),
+            React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.warn, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 } }, `Heute gießen (${thirsty.length})`),
             React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
               thirsty.map(p => {
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
@@ -1603,7 +1818,7 @@ Nur JSON, keine Erklärungen.`;
                 const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
                 return React.createElement('div', {
                   key: p.id,
-                  style: { background: C.warnLight, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.warnBorder}` },
+                  style: { background: C.warnLight, borderRadius: 16, padding: "16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.warnBorder}`, minHeight: 72 },
                   onClick: () => onSelect(p.id)
                 },
                   React.createElement('span', { style: { fontSize: 30 } }, info.icon),
@@ -1615,9 +1830,9 @@ Nur JSON, keine Erklärungen.`;
                         : `Seit ${d} Tag${d !== 1 ? "en" : ""} nicht gegossen`
                     ),
                     adaptive &&                     React.createElement('div', { style: { display: "flex", gap: 4, marginTop: 4 } },
-                      React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, adaptive.season),
-                      React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, LOCATION_TRANSLATIONS[adaptive.location] || adaptive.location),
-                      adaptive.climate !== "moderate" && React.createElement('span', { style: { fontSize: 9, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, CLIMATE_TRANSLATIONS[adaptive.climate] || adaptive.climate)
+                      React.createElement('span', { style: { fontSize: 11, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, adaptive.season),
+                      React.createElement('span', { style: { fontSize: 11, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, LOCATION_TRANSLATIONS[adaptive.location] || adaptive.location),
+                      adaptive.climate !== "moderate" && React.createElement('span', { style: { fontSize: 11, background: C.warnLight, color: C.warn, padding: "2px 6px", borderRadius: 4 } }, CLIMATE_TRANSLATIONS[adaptive.climate] || adaptive.climate)
                     )
                   ),
                   React.createElement('button', {
@@ -1630,7 +1845,7 @@ Nur JSON, keine Erklärungen.`;
           ),
           // All done
           thirsty.length === 0 && React.createElement('div', {
-            style: { background: C.accentLight, borderRadius: 16, padding: "20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }
+            style: { background: `linear-gradient(135deg, ${C.accentLight} 0%, ${C.card} 100%)`, borderRadius: 16, padding: "20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 14, border: `1px solid ${C.border}`, position: "relative", overflow: "hidden" }
           },
             React.createElement('span', { style: { fontSize: 28 } }, "✅"),
             React.createElement('div', null,
@@ -1640,7 +1855,7 @@ Nur JSON, keine Erklärungen.`;
           ),
           // Upcoming
           upcoming.length > 0 && React.createElement('div', { style: { marginBottom: 28 } },
-            React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Bald fällig"),
+            React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 } }, "Bald fällig"),
             React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
               upcoming.map(p => {
                 const info = PLANT_DB[p.type] || PLANT_DB["Andere"];
@@ -1651,7 +1866,8 @@ Nur JSON, keine Erklärungen.`;
                 const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
                 return React.createElement('div', {
                   key: p.id,
-                  style: { background: C.card, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.border}` },
+                  className: "card-stagger",
+                  style: { background: C.card, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${C.border}`, minHeight: 66, animationDelay: `${plants.indexOf(p) * 40}ms` },
                   onClick: () => onSelect(p.id)
                 },
                   React.createElement('span', { style: { fontSize: 28 } }, info.icon),
@@ -1659,7 +1875,7 @@ Nur JSON, keine Erklärungen.`;
                     React.createElement('p', { style: { fontWeight: 500, fontSize: 15 } }, getDisplayName(p)),
                     React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } },
                       React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type),
-                      adaptive && React.createElement('span', { style: { fontSize: 9, background: C.accentLight, color: C.accent, padding: "2px 5px", borderRadius: 4 } }, `${adaptive.interval}d`)
+                      adaptive && React.createElement('span', { style: { fontSize: 11, background: C.accentLight, color: C.accent, padding: "2px 5px", borderRadius: 4 } }, `${adaptive.interval}d`)
                     ),
                     // Sichtbarer Tage-Counter: zählt ab letztem Gießen hoch
                     dSince !== null && dSince > 0 && React.createElement('p', {
@@ -1678,7 +1894,15 @@ Nur JSON, keine Erklärungen.`;
             [
               { label: "Pflanzen", value: plants.length, icon: "🪴" },
               { label: "Heute gegossen", value: plants.filter(p => p.last_watered_date && daysSince(p.last_watered_date) === 0).length, icon: "💧" }
-            ].map(s => React.createElement('div', { key: s.label, style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+            ].map((s, si) => React.createElement('div', {
+              key: s.label,
+              className: "card-stagger",
+              style: {
+                background: C.card, borderRadius: 16, padding: "20px 16px",
+                border: `1px solid ${C.border}`, textAlign: "center",
+                animationDelay: `${si * 80}ms`
+              }
+            },
               React.createElement('span', { style: { fontSize: 22 } }, s.icon),
               React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 28, fontWeight: 600, marginTop: 4 } }, s.value),
               React.createElement('p', { style: { fontSize: 12, color: C.muted } }, s.label)
@@ -1714,7 +1938,7 @@ Nur JSON, keine Erklärungen.`;
 
   // ── PlantsView ─────────────────────────────────────────
   function PlantsView({ plants, rooms, onSelect, onAdd }) {
-    return React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px calc(90px + env(safe-area-inset-bottom, 0px))`, maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
+    return React.createElement('div', { className: 'card-enter', style: { padding: `calc(52px + env(safe-area-inset-top, 0px)) 20px calc(90px + env(safe-area-inset-bottom, 0px))`, maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 } },
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Meine Pflanzen"),
         React.createElement('button', { onClick: onAdd, style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Neu")
@@ -1727,13 +1951,32 @@ Nur JSON, keine Erklärungen.`;
             const d = daysUntilAdaptive(p, rooms);
             const room = rooms.find(r => r.id === p.room_id);
             const adaptive = room ? getEnhancedWateringInterval(p, room) : null;
+            // Urgency: Pflanze die 2× überfällig ist → pulsiert
+            const daysSinceWater = daysSince(p.last_watered_date);
+            const isCritical = water && daysSinceWater !== null && p.watering_interval > 0 && daysSinceWater >= p.watering_interval * 2;
+            const cardIdx = plants.indexOf(p);
             return React.createElement('div', {
               key: p.id, onClick: () => onSelect(p.id),
-              style: { background: C.card, borderRadius: 20, padding: "18px 16px", cursor: "pointer", border: `1px solid ${water ? C.warnBorder : C.border}`, position: "relative" }
+              className: `card-stagger ${isCritical ? ' urgent-pulse' : ''}`,
+              style: {
+                background: C.card, borderRadius: 20, padding: "18px 16px",
+                cursor: "pointer",
+                border:`1px solid ${water ? C.warnBorder : C.border}`,
+                position: "relative", minHeight: 140,
+                transition: "border-color 0.15s ease, transform 0.12s ease",
+                animationDelay: `${cardIdx * 50}ms`
+              }
             },
-              water && React.createElement('div', { style: { position: "absolute", top: 10, right: 10, width: 8, height: 8, borderRadius: 4, background: C.warn } }),
+              // ProgressRing oben rechts in der Karte
+              React.createElement('div', { style: { position: "absolute", top: 12, right: 12 } },
+                React.createElement(ProgressRing, {
+                  daysUntil: d,
+                  interval: adaptive ? adaptive.interval : (p.watering_interval || 7),
+                  size: 34
+                })
+              ),
               React.createElement('span', { style: { fontSize: 36, display: "block", marginBottom: 10 } }, info.icon),
-              React.createElement('p', { style: { fontWeight: 500, fontSize: 15, marginBottom: 2 } }, getDisplayName(p)),
+              React.createElement('p', { style: { fontWeight: 600, fontSize: 15, marginBottom: 3, color: C.text, lineHeight: 1.2 } }, getDisplayName(p)),
               React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
                 React.createElement('p', { style: { fontSize: 12, color: C.muted } }, p.type)
               ),
@@ -1821,8 +2064,8 @@ Nur JSON, keine Erklärungen.`;
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))" } },
       // Header
-      React.createElement('div', { style: { background: water ? C.warnLight : C.accentLight, padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 28px`, borderBottom: `1px solid ${C.border}` } },
-        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0, color: C.text } }, "←"),
+      React.createElement('div', { style: { background: water ? C.warnLight : `linear-gradient(160deg, ${C.accentLight} 0%, ${C.bg} 100%)`, padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 32px`, borderBottom: `1px solid ${C.border}` } },
+        React.createElement('button', { onClick: onBack, style: { background: C.card, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", marginBottom: 20, padding: "8px 16px", color: C.text, borderRadius: 20, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44 } }, "← Zurück"),
         React.createElement('div', { style: { fontSize: 64, marginBottom: 12 } }, info.icon),
         React.createElement('div', null,
           React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 36, fontWeight: 500 } }, getDisplayName(plant)),
@@ -2000,7 +2243,7 @@ Nur JSON, keine Erklärungen.`;
         ),
         // Origin (KI > PLANT_DB)
         React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
-          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } },
+          React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 } },
             `${enrichSource} Herkunft`
           ),
           enrichLoading && !displayOrigin
@@ -2011,7 +2254,7 @@ Nur JSON, keine Erklärungen.`;
         ),
         // Tip (KI > PLANT_DB)
         React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
-          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } },
+          React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 } },
             `${enrichSource} Pflegetipp`
           ),
           enrichLoading && !displayTip
@@ -2029,7 +2272,7 @@ Nur JSON, keine Erklärungen.`;
         ),
         // Notes
         plant.notes && React.createElement('div', { style: { background: C.card, borderRadius: 20, padding: "20px", marginBottom: 16, border: `1px solid ${C.border}` } },
-          React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 } }, "Meine Notizen"),
+          React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 } }, "Meine Notizen"),
           React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6 } }, plant.notes)
         ),
         // Winter tips for balcony plants
@@ -2870,7 +3113,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, borderBottom: `1px solid ${C.border}` } },
-        React.createElement('button', { onClick: onBack, style: { background: "none", border: "none", fontSize: 24, cursor: "pointer", marginBottom: 16, padding: 0, color: C.text } }, "←"),
+        React.createElement('button', { onClick: onBack, style: { background: C.card, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", marginBottom: 20, padding: "8px 16px", color: C.text, borderRadius: 20, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44 } }, "← Zurück"),
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Neue Pflanze")
       ),
       React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))" } },
@@ -2972,7 +3215,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
           }, "Heute schon gegossen?")
         ),
         // Fertilizer section
-        React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+        React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "20px 16px", border: `1px solid ${C.border}`, textAlign: "center" } },
           React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
             React.createElement('p', { style: { fontSize: 14, fontWeight: 500, userSelect: "none" } }, "🧪 Düngeprogramm aktivieren"),
             React.createElement('div', { 
@@ -3016,7 +3259,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
           )
         ),
         // Room selector
-        rooms.length > 0 && React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+        rooms.length > 0 && React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "20px 16px", border: `1px solid ${C.border}`, textAlign: "center" } },
           React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 10 } }, "📍 Raum (optional)"),
           React.createElement('div', { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
             React.createElement('button', {
@@ -3192,7 +3435,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
     );
 
     if (!loaded) return React.createElement('div', { id: 'loading', style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
-      React.createElement('span', { style: { fontSize: 48 } }, "🌿")
+      React.createElement('div', { style: { textAlign: 'center' } }, React.createElement('span', { style: { fontSize: 56, display: 'block', marginBottom: 16 } }, '🌿'), React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 22, fontWeight: 400, color: C.muted, letterSpacing: '0.05em' } }, 'Laden...'))
     );
 
     if (showAdd) return React.createElement(AddPlant, { onAdd: p => { save([...plants, p]); setShowAdd(false); }, onBack: () => setShowAdd(false), existingPlants: plants, rooms });
