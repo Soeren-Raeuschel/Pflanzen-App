@@ -7,24 +7,28 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pflanzen" />
-  <meta name="theme-color" id="theme-meta" content="#FAFBFC" />
-  <title>Pflanzenpflege v3</title>
+  <meta name="theme-color" id="theme-meta" content="#F4F8F5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0C1F15" media="(prefers-color-scheme: dark)" />
+  <title>Pflanzenpflege</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <!-- Cormorant Garamond: Display/Headings -->
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <!-- Satoshi: UI Body (via fontshare CDN) -->
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html, body {
       height: 100%;
       background: #F4F8F5;
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
       color: #1B3328;
       overscroll-behavior: none;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
     html.dark, body.dark { background: #0C1F15; color: #D4EDD8; }
-    input, select, textarea, button { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+    input, select, textarea, button { font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif; }
     ::-webkit-scrollbar { display: none; }
     #root { height: 100%; }
     .safe-top { padding-top: env(safe-area-inset-top, 20px); }
@@ -48,16 +52,40 @@
     .card-enter { animation: fadeSlideUp 0.25s ease forwards; }
     .btn-tap:active { animation: ripple 0.12s ease; }
 
-    /* ── Botanical texture overlay on bg ── */
-    body::before {
+    /* ── Botanical blob background ── */
+    body::before,
+    body::after {
       content: "";
       position: fixed;
-      inset: 0;
       pointer-events: none;
       z-index: 0;
-      background-image:
-        radial-gradient(ellipse 80% 60% at 110% -10%, rgba(82,183,136,0.08) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 50% at -10% 110%, rgba(45,106,79,0.06) 0%, transparent 60%);
+    }
+    /* Blob oben-rechts: accentLight-Farbe, organisch */
+    body::before {
+      /* PLATZHALTER: Ersetze background-image mit deinem haikei-SVG als data:image/svg+xml;base64,... */
+      top: -80px;
+      right: -80px;
+      width: 420px;
+      height: 420px;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M320.5%2C299.5Q277%2C399%2C171.5%2C375.5Q66%2C352%2C57.5%2C253Q49%2C154%2C134.5%2C92Q220%2C30%2C308%2C92Q396%2C154%2C320.5%2C299.5Z' fill='%23D8F3DC' opacity='0.55'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-size: contain;
+    }
+    /* Blob unten-links: dunkleres Grün, zweite Ebene */
+    body::after {
+      bottom: -60px;
+      left: -60px;
+      width: 320px;
+      height: 320px;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M286%2C297Q218%2C394%2C124%2C356Q30%2C318%2C38%2C219Q46%2C120%2C143%2C74Q240%2C28%2C295%2C114Q350%2C200%2C286%2C297Z' fill='%232D6A4F' opacity='0.06'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-size: contain;
+    }
+    html.dark body::before {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M320.5%2C299.5Q277%2C399%2C171.5%2C375.5Q66%2C352%2C57.5%2C253Q49%2C154%2C134.5%2C92Q220%2C30%2C308%2C92Q396%2C154%2C320.5%2C299.5Z' fill='%230A2517' opacity='0.9'/%3E%3C/svg%3E");
+    }
+    html.dark body::after {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M286%2C297Q218%2C394%2C124%2C356Q30%2C318%2C38%2C219Q46%2C120%2C143%2C74Q240%2C28%2C295%2C114Q350%2C200%2C286%2C297Z' fill='%2352B788' opacity='0.05'/%3E%3C/svg%3E");
     }
     #root { position: relative; z-index: 1; }
 
@@ -120,6 +148,23 @@
     @media (prefers-reduced-motion: reduce) {
       .card-stagger, .plant-float, .urgent-pulse, .ring-track { animation: none !important; transition: none !important; }
     }
+
+    /* ── iOS HIG: Focus-visible für Keyboard/Switch Control */
+    :focus-visible {
+      outline: 3px solid #52B788;
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+    :focus:not(:focus-visible) { outline: none; }
+
+    /* ── iOS HIG: Kein Text-Select auf UI-Elementen */
+    button, [role="button"] { user-select: none; -webkit-user-select: none; }
+
+    /* ── iOS HIG: Smooth Scrolling */
+    div { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+
+    /* ── Satoshi Zahlen tabular für Stats ── */
+    .stat-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
   </style>
 </head>
 <body>
@@ -131,6 +176,32 @@
 
   <script>
   const { useState, useEffect, useCallback } = React;
+
+  // ── Blob-Config ────────────────────────────────────────────
+  // Um deinen haikei-Blob einzutauschen:
+  // 1. haikei.app → dein Blob als SVG exportieren
+  // 2. SVG-Dateiinhalt auf base64 konvertieren (z.B. base64encode.org)
+  // 3. BLOB_TOP_RIGHT unten ersetzen mit: "data:image/svg+xml;base64,DEIN_BASE64"
+  // 4. Datei speichern → fertig, kein weiterer Code-Edit nötig
+  const BLOB_CONFIG = {
+    topRight: "data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDY3Ljk4NTg4NDMxMzA4NzEgMzA3LjEyMDgzNTM3NTAwNTg3KSI+PHBhdGggZD0iTTEzNS45IC0xNDAuOUMxNjkuMSAtMTAyLjggMTg0IC01MS40IDE5My43IDkuN0MyMDMuNCA3MC43IDIwNy44IDE0MS40IDE3NC42IDE3My42QzE0MS40IDIwNS44IDcwLjcgMTk5LjQgMTcuNyAxODEuN0MtMzUuNCAxNjQgLTcwLjcgMTM1IC0xMTYuOSAxMDIuOUMtMTYzIDcwLjcgLTIyMCAzNS40IC0yMzMuNSAtMTMuNEMtMjQ2LjkgLTYyLjIgLTIxNi44IC0xMjQuNSAtMTcwLjYgLTE2Mi42Qy0xMjQuNSAtMjAwLjggLTYyLjIgLTIxNC45IC01LjQgLTIwOS41QzUxLjQgLTIwNCAxMDIuOCAtMTc5LjEgMTM1LjkgLTE0MC45IiBmaWxsPSIjRDhGM0RDIj48L3BhdGg+PC9nPjwvc3ZnPg==",  // haikei-Blob
+    bottomLeft: null // ← optional zweiter Blob
+  };
+  // Blobs per JS einsetzen (überschreibt CSS-Platzhalter wenn vorhanden)
+  if (BLOB_CONFIG.topRight) {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = `body::before { background-image: url("${BLOB_CONFIG.topRight}") !important; }`;
+      document.head.appendChild(style);
+    });
+  }
+  if (BLOB_CONFIG.bottomLeft) {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = `body::after { background-image: url("${BLOB_CONFIG.bottomLeft}") !important; }`;
+      document.head.appendChild(style);
+    });
+  }
 
   // ── Globale Konstanten (müssen vor allen anderen Deklarationen stehen) ─────
   const MS_PER_DAY         = 86_400_000;  // 1 Tag in Millisekunden
@@ -1112,7 +1183,7 @@
       }, step);
       return () => clearInterval(timer);
     }, [target]);
-    return React.createElement('p', { style: { fontSize: 24, fontWeight: 600, color: C.text } }, display);
+    return React.createElement('p', { className: "stat-num", style: { fontSize: 24, fontWeight: 600, color: C.text } }, display);
   }
 
   // ── WaterRipple (Animation #2) ───────────────────────────
@@ -1148,7 +1219,7 @@
             width: p.size,
             height: p.size,
             background: p.color,
-            animationDelay:`${p.delay}s`,
+            animationDelay: `${p.delay}s`,
             borderRadius: p.id % 2 === 0 ? "50%" : "2px"
           }
         })
@@ -1184,11 +1255,14 @@
         zIndex: 100 
       }
     },
-      React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "space-around" } },
+      React.createElement('div', { role: "tablist", "aria-label": "Hauptnavigation", style: { display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "space-around" } },
         ...tabs.map(tab =>
           React.createElement('button', {
             key: tab.id, 
             onClick: () => onChange(tab.id),
+            role: "tab",
+            "aria-selected": active === tab.id,
+            "aria-label": tab.label,
             style: { 
               background: "none", 
               border: "none", 
@@ -1407,14 +1481,26 @@
 
   // ── EmptyState ─────────────────────────────────────────
   function EmptyState({ onAdd }) {
-    return React.createElement('div', { style: { textAlign: "center", paddingTop: 60 } },
-      React.createElement('div', { style: { fontSize: 64, marginBottom: 16 } }, "🌱"),
-      React.createElement('p', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 24, fontWeight: 500, marginBottom: 8 } }, "Noch keine Pflanzen"),
-      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 28 } }, "Füge deine erste Pflanze hinzu!"),
+    return React.createElement('div', { style: { textAlign: "center", paddingTop: 48, paddingBottom: 32 } },
+      React.createElement('div', { style: { display: "flex", justifyContent: "center", gap: 12, marginBottom: 20 } },
+        React.createElement('span', { className: "plant-float", style: { fontSize: 44, animationDelay: "0s" } }, "🌱"),
+        React.createElement('span', { className: "plant-float", style: { fontSize: 56, animationDelay: "0.4s" } }, "🌿"),
+        React.createElement('span', { className: "plant-float", style: { fontSize: 44, animationDelay: "0.8s" } }, "🪴")
+      ),
+      React.createElement('p', {
+        style: { fontFamily: "'Cormorant Garamond'", fontSize: 30, fontWeight: 400, color: C.text, marginBottom: 8, letterSpacing: "-0.01em" }
+      }, "Noch keine Pflanzen"),
+      React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 6, lineHeight: 1.7, maxWidth: 260, margin: "0 auto 8px" } },
+        "Füge deine erste Pflanze hinzu und behalte den Überblick über Gießzeiten und Pflege."
+      ),
+      React.createElement('p', { style: { fontSize: 12, color: C.subtle || C.muted, marginBottom: 24, fontStyle: "italic" } },
+        "27 Pflanzenarten bereits hinterlegt"
+      ),
       React.createElement('button', {
         onClick: onAdd,
-        style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 14, padding: "14px 28px", fontSize: 15, fontWeight: 500, cursor: "pointer" }
-      }, "Pflanze hinzufügen")
+        "aria-label": "Erste Pflanze hinzufügen",
+        style: { background: C.accent, color: C.inverse, border: "none", borderRadius: 14, padding: "14px 28px", fontSize: 15, fontWeight: 500, cursor: "pointer", minHeight: 48 }
+      }, "🌱  Erste Pflanze hinzufügen")
     );
   }
 
@@ -1957,11 +2043,13 @@ Nur JSON, keine Erklärungen.`;
             const cardIdx = plants.indexOf(p);
             return React.createElement('div', {
               key: p.id, onClick: () => onSelect(p.id),
-              className: `card-stagger ${isCritical ? ' urgent-pulse' : ''}`,
+              role: "button", tabIndex: 0,
+              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(p.id); } },
+              className: `card-stagger${isCritical ? ' urgent-pulse' : ''}`,
               style: {
                 background: C.card, borderRadius: 20, padding: "18px 16px",
                 cursor: "pointer",
-                border:`1px solid ${water ? C.warnBorder : C.border}`,
+                border: `1px solid ${water ? C.warnBorder : C.border}`,
                 position: "relative", minHeight: 140,
                 transition: "border-color 0.15s ease, transform 0.12s ease",
                 animationDelay: `${cardIdx * 50}ms`
@@ -2065,7 +2153,7 @@ Nur JSON, keine Erklärungen.`;
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))" } },
       // Header
       React.createElement('div', { style: { background: water ? C.warnLight : `linear-gradient(160deg, ${C.accentLight} 0%, ${C.bg} 100%)`, padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 32px`, borderBottom: `1px solid ${C.border}` } },
-        React.createElement('button', { onClick: onBack, style: { background: C.card, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", marginBottom: 20, padding: "8px 16px", color: C.text, borderRadius: 20, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44 } }, "← Zurück"),
+        React.createElement('button', { onClick: onBack, "aria-label": "Zurück zur Pflanzenübersicht", style: { background: C.card, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", marginBottom: 20, padding: "8px 16px", color: C.text, borderRadius: 20, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44 } }, "← Zurück"),
         React.createElement('div', { style: { fontSize: 64, marginBottom: 12 } }, info.icon),
         React.createElement('div', null,
           React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 36, fontWeight: 500 } }, getDisplayName(plant)),
@@ -3113,7 +3201,7 @@ Antworte NUR mit dem JSON für "${safeName}":`;
 
     return React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg } },
       React.createElement('div', { style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, borderBottom: `1px solid ${C.border}` } },
-        React.createElement('button', { onClick: onBack, style: { background: C.card, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", marginBottom: 20, padding: "8px 16px", color: C.text, borderRadius: 20, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44 } }, "← Zurück"),
+        React.createElement('button', { onClick: onBack, "aria-label": "Zurück zur Pflanzenübersicht", style: { background: C.card, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", marginBottom: 20, padding: "8px 16px", color: C.text, borderRadius: 20, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44 } }, "← Zurück"),
         React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500 } }, "Neue Pflanze")
       ),
       React.createElement('div', { style: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: "calc(40px + env(safe-area-inset-bottom, 0px))" } },
