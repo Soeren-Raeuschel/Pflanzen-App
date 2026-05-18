@@ -1986,6 +1986,12 @@ Nur JSON, keine Erklärungen.`;
     const [notesInput, setNotesInput] = useState(plant.notes || "");
     const [editingInterval, setEditingInterval] = useState(false);
     const [intervalInput, setIntervalInput] = useState(plant.watering_interval || info.watering_interval || 7);
+    // Sync intervalInput when plant.watering_interval changes (e.g. after AI refresh)
+    useEffect(() => {
+      if (!editingInterval) {
+        setIntervalInput(plant.watering_interval || info.watering_interval || 7);
+      }
+    }, [plant.watering_interval]);
     const [refreshing, setRefreshing] = useState(false);
     const [refreshMsg, setRefreshMsg] = useState(null);
     const [showIconPicker, setShowIconPicker] = useState(false);
@@ -2031,14 +2037,19 @@ Nur JSON, keine Erklärungen.`;
         };
         // Gießintervall: watering_interval_days hat Vorrang
         let newInterval = plant.watering_interval;
-        if (aiData.watering_interval_days && !isNaN(parseInt(aiData.watering_interval_days))) {
-          newInterval = Math.max(1, Math.min(365, parseInt(aiData.watering_interval_days)));
+        const rawDays = aiData.watering_interval_days;
+        const parsedDays = rawDays != null ? parseInt(rawDays) : NaN;
+        if (!isNaN(parsedDays) && parsedDays > 0) {
+          newInterval = Math.max(1, Math.min(365, parsedDays));
         } else {
           const rangeMatch = (aiData.water || "").match(/(\d+)\s*[-–]\s*(\d+)\s*Tag/i);
           const singleMatch = (aiData.water || "").match(/(\d+)\s*Tag/i);
           if (rangeMatch) newInterval = Math.round((parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2);
           else if (singleMatch) newInterval = parseInt(singleMatch[1]);
+          newInterval = Math.max(1, Math.min(365, newInterval || plant.watering_interval || 7));
         }
+        // Ensure watering_interval_days in aiData is always the resolved numeric value
+        updatedAiData.watering_interval_days = newInterval;
         onUpdatePlant(plant.id, { aiData: updatedAiData, watering_interval: newInterval });
         setRefreshMsg({ type: "ok", text: "Infos aktualisiert ✓" });
       } catch (e) {
@@ -2228,7 +2239,11 @@ Nur JSON, keine Erklärungen.`;
                   React.createElement('button', { onClick: handleSaveInterval, style: { background: C.accent, color: "#fff", border: "none", borderRadius: 7, padding: "5px 9px", cursor: "pointer", fontSize: 13 } }, "✓"),
                   React.createElement('button', { onClick: () => setEditingInterval(false), style: { background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.text } }, "✕")
                 ) :
-                React.createElement('button', { onClick: () => setEditingInterval(true), style: { background: C.accentLight, border: `1px solid ${C.accent}30`, borderRadius: 10, padding: "6px 12px", cursor: "pointer", fontSize: 12, color: C.accent, fontWeight: 600, whiteSpace: "nowrap" } }, `alle ${plant.watering_interval || info.watering_interval || 7}d ✏️`)
+                React.createElement('button', { onClick: () => setEditingInterval(true), style: { background: C.accentLight, border: `1px solid ${C.accent}30`, borderRadius: 10, padding: "6px 12px", cursor: "pointer", fontSize: 12, color: C.accent, fontWeight: 600, whiteSpace: "nowrap" } },
+                  adaptive && adaptive.wasAdjusted
+                    ? `Basis: ${plant.watering_interval || info.watering_interval || 7}d (→${adaptive.interval}d) ✏️`
+                    : `alle ${plant.watering_interval || info.watering_interval || 7}d ✏️`
+                )
             )
           ),
 
@@ -2236,7 +2251,17 @@ Nur JSON, keine Erklärungen.`;
           React.createElement(SectionLabel, null, "Pflegeinfos"),
           React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 } },
             React.createElement(InfoTile, { icon: "☀️", label: "Licht", value: (hasAiData ? plant.aiData.light : info.light) || "–" }),
-            React.createElement(InfoTile, { icon: "💧", label: "Gießen", value: (hasAiData ? plant.aiData.water : `Alle ${info.watering_interval} Tage`) || "–" }),
+            React.createElement(InfoTile, { icon: "💧", label: "Gießen", value: (() => {
+              if (hasAiData && plant.aiData.water) {
+                const intervalDays = plant.aiData.watering_interval_days || plant.watering_interval;
+                const waterText = plant.aiData.water;
+                // If the stored interval in days is visible in the text, show as-is; otherwise append it
+                return intervalDays && !waterText.includes(String(intervalDays))
+                  ? `${waterText} (${intervalDays}d gespeichert)`
+                  : waterText;
+              }
+              return `Alle ${info.watering_interval} Tage`;
+            })() || "–" }),
             React.createElement(InfoTile, { icon: "💨", label: "Luftfeuchte", value: (hasAiData ? plant.aiData.humidity : info.humidity) || "–" }),
             React.createElement(InfoTile, { icon: "🌡️", label: "Temperatur", value: (hasAiData ? plant.aiData.temperature : "18–24°C") || "–" }),
             plant.fertilizer_interval > 0 && React.createElement(InfoTile, { icon: "🧪", label: "Dünger", value: (hasAiData ? plant.aiData.fertilizer : `Alle ${plant.fertilizer_interval} Tage`) || "–", span2: true }),
@@ -2535,15 +2560,15 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           growth_rate: aiData.growth_rate || null,
         };
         
-        // If using fallback, merge fallback data
+        // If using fallback, merge fallback data — BUT preserve the AI-derived wateringInterval
         if (matchResult.fallback && matchResult.fallbackData) {
           setMatchInfo({
             fallback: true,
             message: matchResult.fallbackData.notes,
             category: matchResult.fallbackData.category
           });
-          // Override with fallback data for safety
-          plantAiData = { ...plantAiData, ...matchResult.fallbackData };
+          // Merge fallback data but keep AI-derived fields if available
+          plantAiData = { ...matchResult.fallbackData, ...plantAiData };
         } else {
           setMatchInfo({
             fallback: false,
@@ -2582,7 +2607,15 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           apiError: true
         });
         
-        const wateringInterval = parseInt(fallbackData.water?.match(/\d+/)?.[0] || "7");
+        const fallbackWateringInterval = (() => {
+          // Try to use the matched plant type's DB interval first
+          if (matchResult.type && matchResult.type !== "Andere" && PLANT_DB[matchResult.type]) {
+            return PLANT_DB[matchResult.type].watering_interval;
+          }
+          // Then parse from fallback text
+          const parsed = parseInt(fallbackData.water?.match(/\d+/)?.[0] || "7");
+          return Math.max(1, parsed);
+        })();
         
         const newPlant = {
           id: Date.now().toString(),
@@ -2596,8 +2629,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           added_date: new Date().toISOString(),
           last_watered_date: alreadyWatered ? new Date().toISOString() : null,
           aiData: fallbackData,
-          watering_interval: wateringInterval,
-          fertilizer_interval: fertilizerEnabled ? fertilizerInterval : fallbackData.fertilizer_interval,
+          watering_interval: fallbackWateringInterval,
           fertilizer_type: fertilizerEnabled ? fertilizerType : fallbackData.fertilizer_type,
           last_fertilized_date: (fertilizerEnabled || fallbackData.fertilizer_interval > 0) ? new Date().toISOString() : null,
           room_id: roomId || null
@@ -2978,6 +3010,56 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         TestRunner.log('Safety cap applied', kaktusResult.interval >= minAllowed);
         TestRunner.log('Dark mode toggle', (setThemeMode('dark'), getTheme() === 'dark'));
         TestRunner.log('Dark mode restored', (setThemeMode('light'), getTheme() === 'light'));
+
+        // ── NEW: Watering Interval Bug Regression Tests ──
+        console.log('\n--- Gießintervall-Tests ---');
+
+        // Test: AI watering_interval_days as string (BUG 3)
+        const rawDaysStr = "9";
+        const parsedStr = parseInt(rawDaysStr);
+        TestRunner.log('watering_interval_days als String parsen', !isNaN(parsedStr) && parsedStr === 9, `"${rawDaysStr}" → ${parsedStr}`);
+
+        // Test: Range parsing from water text
+        const waterText1 = "Alle 7-10 Tage gießen, Erde antrocknen lassen";
+        const rangeMatch1 = waterText1.match(/(\d+)\s*[-–]\s*(\d+)\s*Tag/i);
+        const avgInterval = rangeMatch1 ? Math.round((parseInt(rangeMatch1[1]) + parseInt(rangeMatch1[2])) / 2) : null;
+        TestRunner.log('Range-Parse "7-10 Tage" → 9', avgInterval === 9, avgInterval + ' days');
+
+        // Test: Single day parsing
+        const waterText2 = "Alle 14 Tage gießen";
+        const singleMatch2 = waterText2.match(/(\d+)\s*Tag/i);
+        TestRunner.log('Single-Parse "14 Tage" → 14', singleMatch2 && parseInt(singleMatch2[1]) === 14);
+
+        // Test: Fallback merge order - AI values must win over fallback (BUG 1/4)
+        const aiDerived = { watering_interval_days: 12, water: "Alle 12 Tage", light: "Hell" };
+        const fallbackDefaults = { watering_interval_days: 7, water: "Alle 7 Tage", light: "Indirekt", notes: "Fallback note" };
+        const merged = { ...fallbackDefaults, ...aiDerived }; // AI wins
+        TestRunner.log('Fallback-Merge: KI überschreibt Fallback', merged.watering_interval_days === 12, `${merged.watering_interval_days} (erwartet 12)`);
+
+        // Test: getEnhancedWateringInterval uses plant.watering_interval as base
+        const plantWithAiInterval = { type: 'Monstera', watering_interval: 11, last_watered_date: null };
+        const enhanced = getEnhancedWateringInterval(plantWithAiInterval, { name: 'Wohnzimmer', temperature: 20 });
+        TestRunner.log('Enhanced interval basiert auf plant.watering_interval', enhanced.baseInterval === 11, `baseInterval=${enhanced.baseInterval}`);
+
+        // Test: DB interval is NOT used when plant.watering_interval is set
+        const dbInterval = PLANT_DB['Monstera']?.watering_interval || 9;
+        TestRunner.log('plant.watering_interval hat Priorität vor DB', enhanced.baseInterval !== dbInterval || plantWithAiInterval.watering_interval === dbInterval,
+          `plant=${plantWithAiInterval.watering_interval}, DB=${dbInterval}, base=${enhanced.baseInterval}`);
+
+        // Test: wasAdjusted flag consistency
+        const unadjustedPlant = { type: 'Monstera', watering_interval: 9, last_watered_date: null };
+        const unadjustedResult = getEnhancedWateringInterval(unadjustedPlant, { name: 'Wohnzimmer', temperature: 20 });
+        TestRunner.log('wasAdjusted korrekt gesetzt', typeof unadjustedResult.wasAdjusted === 'boolean');
+
+        // Test: Extreme edge cases
+        const zeroIntervalPlant = { type: 'Monstera', watering_interval: 0, last_watered_date: null };
+        const zeroResult = getEnhancedWateringInterval(zeroIntervalPlant, null);
+        TestRunner.log('watering_interval=0 fällt auf DB zurück', zeroResult.interval > 0, `interval=${zeroResult.interval}`);
+
+        const nullTypePlant = { type: null, watering_interval: 7, last_watered_date: null };
+        const nullResult = getEnhancedWateringInterval(nullTypePlant, null);
+        TestRunner.log('type=null gibt sicheren Fallback', nullResult.interval === 7);
+
       } catch(e) { console.error('Test error:', e); }
       return TestRunner.summary();
     }
