@@ -792,7 +792,7 @@
 
   let weatherData = null;
   const WEATHER_CACHE_KEY = 'pflanzen_weather_cache';
-  const WEATHER_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  const WEATHER_CACHE_DURATION = 60 * 60 * 1000; // 1 hour (was 24h)
   
   // Get cached weather data
   function getCachedWeather() {
@@ -817,13 +817,22 @@
       }));
     } catch(e) {}
   }
+
+  // Force-refresh: bypass cache and fetch live data
+  async function refreshWeather() {
+    try { localStorage.removeItem(WEATHER_CACHE_KEY); } catch(e) {}
+    weatherData = null;
+    return fetchWeather(true);
+  }
   
-  async function fetchWeather() {
-    // Check cache first
-    const cached = getCachedWeather();
-    if (cached) {
-      weatherData = cached;
-      return weatherData;
+  async function fetchWeather(force) {
+    // Check cache first (unless forced)
+    if (!force) {
+      const cached = getCachedWeather();
+      if (cached) {
+        weatherData = cached;
+        return weatherData;
+      }
     }
     
     try {
@@ -1005,6 +1014,12 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ERWEITERTE UMWELT-LOGIK: Konservativ & Überwässerungs-Sicher
   // ═══════════════════════════════════════════════════════════════════════════
+  // Prinzip: ADDITIVES Delta-System statt multiplikativem Stacking.
+  // Jeder Faktor liefert ein Delta in Tagen (positiv = seltener, negativ = öfter).
+  // Alle Deltas werden summiert und auf ±MAX_TOTAL_DELTA begrenzt,
+  // damit kein einzelner oder kombinierter Faktor das Intervall unrealistisch verzerrt.
+
+  const MAX_TOTAL_DELTA_FRACTION = 0.35; // max. ±35% Abweichung vom Basisintervall
 
   function getCurrentSeason() {
     const month = new Date().getMonth() + 1;
@@ -1044,31 +1059,50 @@
     return 7;
   }
 
-  // Modifikatoren für das Gieß-INTERVALL (Tage zwischen Gießgaben).
-  // Wert < 1.0 = kürzeres Intervall = öfter gießen. Wert > 1.0 = seltener gießen.
-  // fertilizer-Werte (für getEnhancedFertilizerInterval): < 1.0 = öfter düngen.
+  // Delta-Werte in Tagen (relativ zum Basisintervall via Faktor).
+  // Jeder Wert ist ein Multiplikator, der in ein Delta umgerechnet wird.
+  // Saison: Sommer → −10% des Basis, Winter → +30% des Basis
   const SEASON_MODIFIERS = {
-    summer: { water: 0.8,  fertilizer: 0.8  },  // Sommer: öfter gießen & düngen
-    spring: { water: 0.9,  fertilizer: 0.9  },  // Frühling: leicht öfter
-    autumn: { water: 1.1,  fertilizer: 1.4  },  // Herbst: seltener gießen, weniger düngen
-    winter: { water: 1.4,  fertilizer: 3.0  }   // Winter: deutlich seltener, kaum düngen
+    summer: { water: -0.10, fertilizer: 0.8  },
+    spring: { water: -0.05, fertilizer: 0.9  },
+    autumn: { water: +0.10, fertilizer: 1.4  },
+    winter: { water: +0.30, fertilizer: 3.0  }
   };
 
+  // Standort-Delta (als Anteil am Basisintervall)
   const LOCATION_MODIFIERS = {
-    balcony: 0.85,  // Wind + direktere Sonne → öfter gießen
-    garden:  0.9,   // ähnlich wie Balkon
-    indoor:  1.0,   // Basis
-    bathroom: 1.15, // hohe Luftfeuchtigkeit → seltener gießen
-    kitchen: 0.95   // tendenziell warm & trocken → etwas öfter
+    balcony:  -0.10,  // Wind + Sonne → etwas öfter, aber moderat
+    garden:   -0.08,
+    indoor:    0.0,
+    bathroom: +0.10,
+    kitchen:  -0.05
   };
 
+  // Temperatur-Delta (Raumtemperatur oder Live-Außentemperatur)
+  // Nur der stärkere der beiden Werte wird verwendet (nicht beide addiert)
   const CLIMATE_MODIFIERS = {
-    hot: 0.85,
-    warm: 0.9,
-    moderate: 1.0,
-    cool: 1.15,
-    cold: 1.25
+    hot:      -0.10,
+    warm:     -0.05,
+    moderate:  0.0,
+    cool:     +0.08,
+    cold:     +0.20
   };
+
+  // Live-Wetter-Delta: ersetzt den Klima-Modifier für Außenstandorte,
+  // wird NICHT zusätzlich dazu addiert
+  const WEATHER_TEMP_MODIFIERS = {
+    hot:      -0.12,
+    warm:     -0.06,
+    moderate:  0.0,
+    cool:     +0.08,
+    cold:     +0.18
+  };
+
+  // Get the live weather climate label (uses global weatherData)
+  function getLiveWeatherClimate() {
+    if (!weatherData || weatherData.temp === undefined) return null;
+    return determineClimate(weatherData.temp);
+  }
 
   const LOCATION_TRANSLATIONS = {
     balcony: "Balkon",
@@ -1104,14 +1138,13 @@
     return "cold";
   }
 
-  // Hauptfunktion für sichere Gießanpassung
+  // Hauptfunktion für sichere Gießanpassung — ADDITIVES DELTA-SYSTEM
   function getEnhancedWateringInterval(plant, room) {
     if (!plant || !plant.type) {
       return { interval: 7, reasons: [], baseInterval: 7, status: "standard", minDays: 2 };
     }
     
-    // ── Basis-Intervall: plant.watering_interval hat absolute Priorität ──
-    // Erst KI-Wert (gespeichert auf plant), dann statische DB, dann Kategorie-Schätzung
+    // Basis-Intervall: plant.watering_interval hat absolute Priorität
     const storedInterval = plant.watering_interval;
     const dbInterval = PLANT_DB[plant.type]?.watering_interval;
     const catInterval = getBaseWateringInterval(plant.type);
@@ -1123,65 +1156,84 @@
     const location = getLocationFromRoom(room);
     const temperature = room?.temperature ?? null;
     const climate = determineClimate(temperature);
-    
-    let adjusted = baseInterval;
+    const liveClimate = getLiveWeatherClimate();
+
+    let totalDeltaFraction = 0; // Summe aller Deltas als Anteil am Basisintervall
     let reasons = [];
     let riskWarnings = [];
-    
-    // 1. Saison-Anpassung — nur wenn kein Raum-Override
-    const seasonMod = SEASON_MODIFIERS[season];
-    if (seasonMod && seasonMod.water !== 1.0) {
-      adjusted *= seasonMod.water;
-      const pct = Math.round((seasonMod.water - 1) * 100);
+
+    // 1. Saison-Delta
+    const seasonDelta = SEASON_MODIFIERS[season]?.water ?? 0;
+    if (seasonDelta !== 0) {
+      totalDeltaFraction += seasonDelta;
+      const pct = Math.round(seasonDelta * 100);
       reasons.push(`${getSeasonName(season)}: ${pct > 0 ? '+' : ''}${pct}%`);
     }
-    
-    // 2. Standort-Anpassung — nur wenn nicht "indoor" (neutral)
-    const locMod = LOCATION_MODIFIERS[location];
-    if (locMod && locMod !== 1.0) {
-      adjusted *= locMod;
+
+    // 2. Standort-Delta
+    const locDelta = LOCATION_MODIFIERS[location] ?? 0;
+    if (locDelta !== 0) {
+      totalDeltaFraction += locDelta;
       reasons.push(`Standort: ${LOCATION_TRANSLATIONS[location] || location}`);
     }
-    
-    // 3. Klima-Anpassung — nur wenn nicht "moderate"
-    const climateMod = CLIMATE_MODIFIERS[climate];
-    if (climateMod && climateMod !== 1.0) {
-      adjusted *= climateMod;
-      reasons.push(`Klima: ${CLIMATE_TRANSLATIONS[climate] || climate}`);
+
+    // 3. Temperatur-Delta: Live-Wetter hat Vorrang vor Raumtemperatur für Außenstandorte.
+    //    Für Innenräume wird die Raumtemperatur verwendet.
+    //    WICHTIG: nur EINER der beiden Werte fließt ein (kein Stacking).
+    const isOutdoor = location === "balcony" || location === "garden";
+    let tempDelta = 0;
+    let tempLabel = null;
+    if (isOutdoor && liveClimate) {
+      tempDelta = WEATHER_TEMP_MODIFIERS[liveClimate] ?? 0;
+      if (tempDelta !== 0) {
+        const emoji = liveClimate === "hot" ? "🌡️" : liveClimate === "cold" ? "❄️" : "🌤️";
+        tempLabel = `${emoji} ${weatherData.temp}°C draußen`;
+      }
+    } else if (!isOutdoor && climate !== "moderate") {
+      tempDelta = CLIMATE_MODIFIERS[climate] ?? 0;
+      if (tempDelta !== 0) tempLabel = `Raumklima: ${CLIMATE_TRANSLATIONS[climate]}`;
     }
-    
-    // 4. Sicherheits-Beschränkungen: max ±35% vom Basis-Intervall, und absolute Minima
+    if (tempDelta !== 0 && tempLabel) {
+      totalDeltaFraction += tempDelta;
+      reasons.push(tempLabel);
+    }
+
+    // 4. Gesamtdelta auf ±MAX_TOTAL_DELTA_FRACTION begrenzen
+    const cap = MAX_TOTAL_DELTA_FRACTION;
+    totalDeltaFraction = Math.max(-cap, Math.min(cap, totalDeltaFraction));
+
+    // 5. Finales Intervall berechnen
     const cat = getPlantCategory(plant.type);
     const minAbsolute = cat === "succulent" ? 7 : (cat === "herb" || cat === "vegetable") ? 1 : 2;
-    const lowerBound = Math.max(minAbsolute, baseInterval * 0.65);
-    const upperBound = baseInterval * 1.5; // max 50% länger (z.B. Winter-Ruhephase)
-    adjusted = Math.min(upperBound, Math.max(lowerBound, adjusted));
-    
-    // 5. Warnungen
+    const adjusted = baseInterval + Math.round(baseInterval * totalDeltaFraction);
+    const finalInterval = Math.max(minAbsolute, adjusted);
+
+    // 6. Warnungen
     if (season === "winter" && cat !== "tropical" && cat !== "herb") {
       riskWarnings.push("Winter: Überwässerungsrisiko — Erde vor dem Gießen prüfen");
     }
     if (season === "summer" && location === "balcony") {
       riskWarnings.push("Balkon Sommer: Erde täglich kontrollieren");
     }
-    
-    const finalInterval = Math.max(minAbsolute, Math.round(adjusted));
+
     const daysSinceWater = daysSince(plant.last_watered_date);
     let status = "safe";
     if (daysSinceWater !== null && daysSinceWater >= Math.floor(finalInterval * 0.88)) status = "ready";
     else if (daysSinceWater !== null && daysSinceWater < Math.floor(finalInterval * 0.4)) status = "too-early";
-    
+
     return {
       interval: finalInterval,
       baseInterval: baseInterval,
       reasons: reasons,
-      wasAdjusted: finalInterval !== Math.round(baseInterval),
+      wasAdjusted: finalInterval !== baseInterval,
       season: getSeasonName(season),
       location: location,
       climate: climate,
       status: status,
       riskWarnings: riskWarnings,
       minDays: minAbsolute,
+      liveWeatherTemp: weatherData?.temp ?? null,
+      liveWeatherClimate: liveClimate,
       checkSoil: true
     };
   }
@@ -1692,11 +1744,30 @@
   }
 
   // ── RoomView ───────────────────────────────────────────
-  function RoomView({ rooms, plants, weather, onEditRoom, onSelectPlant, onAddRoom, onDeleteRoom }) {
+  function RoomView({ rooms, plants, weather, onEditRoom, onSelectPlant, onAddRoom, onDeleteRoom, onRefreshWeather }) {
     const [newRoomName, setNewRoomName] = React.useState("");
     const [editingRoom, setEditingRoom] = React.useState(null);
     const [editForm, setEditForm] = React.useState({});
     const [confirmDeleteRoom, setConfirmDeleteRoom] = React.useState(null);
+    const [weatherRefreshing, setWeatherRefreshing] = React.useState(false);
+    const [weatherMsg, setWeatherMsg] = React.useState(null);
+
+    const handleRefreshWeather = async () => {
+      setWeatherRefreshing(true);
+      setWeatherMsg(null);
+      try {
+        const w = await onRefreshWeather();
+        if (w) {
+          setWeatherMsg({ ok: true, text: `✓ Aktualisiert: ${w.temp}°C, ${w.humidity}%` });
+        } else {
+          setWeatherMsg({ ok: false, text: "Wetter konnte nicht geladen werden." });
+        }
+      } catch(e) {
+        setWeatherMsg({ ok: false, text: "Fehler beim Abrufen des Wetters." });
+      }
+      setWeatherRefreshing(false);
+      setTimeout(() => setWeatherMsg(null), 3000);
+    };
 
     const handleAddRoom = () => {
       if (!newRoomName.trim()) return;
@@ -1716,19 +1787,59 @@
       React.createElement('p', { style: { fontSize: 14, color: C.muted, marginBottom: 24 } }, "Pflanzen nach Räumen organisieren"),
       
       // Weather info
-      weather && React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", marginBottom: 20, border: `1px solid ${C.accent}` } },
-        React.createElement('p', { style: { fontSize: 12, fontWeight: 500, color: C.accent, marginBottom: 8 } }, "🌤️ Außenklima (Live)"),
-        React.createElement('div', { style: { display: "flex", gap: 20 } },
-          React.createElement('div', null,
-            React.createElement('span', { style: { fontSize: 24 } }, "🌡️"),
-            React.createElement('p', { style: { fontSize: 20, fontWeight: 600, color: C.text } }, `${weather?.temp}°C`),
-            React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Außentemperatur")
+      React.createElement('div', { style: { marginBottom: 20 } },
+        weather ? React.createElement('div', { style: { background: C.accentLight, borderRadius: 16, padding: "16px", border: `1px solid ${C.accent}40` } },
+          React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 } },
+            React.createElement('p', { style: { fontSize: 12, fontWeight: 600, color: C.accent, letterSpacing: "0.06em", textTransform: "uppercase" } }, "🌤️ Außenklima"),
+            React.createElement('button', {
+              onClick: handleRefreshWeather,
+              disabled: weatherRefreshing,
+              style: {
+                background: weatherRefreshing ? C.border : C.accent,
+                color: weatherRefreshing ? C.muted : "#fff",
+                border: "none", borderRadius: 10, padding: "6px 12px",
+                fontSize: 12, fontWeight: 500, cursor: weatherRefreshing ? "default" : "pointer",
+                display: "flex", alignItems: "center", gap: 5,
+                transition: "all 0.2s"
+              }
+            },
+              weatherRefreshing
+                ? React.createElement('span', { style: { display: "inline-block", animation: "pulseGlow 1s ease infinite" } }, "⏳")
+                : "↻",
+              weatherRefreshing ? " Lädt…" : " Aktualisieren"
+            )
           ),
-          React.createElement('div', null,
-            React.createElement('span', { style: { fontSize: 24 } }, "💧"),
-            React.createElement('p', { style: { fontSize: 20, fontWeight: 600, color: C.text } }, `${weather?.humidity}%`),
-            React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Luftfeuchtigkeit")
-          )
+          React.createElement('div', { style: { display: "flex", gap: 24, alignItems: "center" } },
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 24, fontWeight: 700, color: C.text, lineHeight: 1 } }, `${weather.temp}°C`),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 2 } }, "Außentemperatur")
+            ),
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontSize: 24, fontWeight: 700, color: C.text, lineHeight: 1 } }, `${weather.humidity}%`),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 2 } }, "Luftfeuchtigkeit")
+            ),
+            weather.updated && React.createElement('div', { style: { marginLeft: "auto", textAlign: "right" } },
+              React.createElement('p', { style: { fontSize: 10, color: C.muted } }, "Stand"),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, fontWeight: 500 } },
+                new Date(weather.updated).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+              )
+            )
+          ),
+          weatherMsg && React.createElement('p', {
+            style: { fontSize: 12, marginTop: 10, color: weatherMsg.ok ? C.accent : C.warn, fontWeight: 500, animation: "fadeIn 0.2s ease both" }
+          }, weatherMsg.text),
+          React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 8 } }, "⚡ Gießintervalle für Balkon- & Außenpflanzen werden automatisch angepasst.")
+        ) : React.createElement('button', {
+          onClick: handleRefreshWeather,
+          disabled: weatherRefreshing,
+          style: {
+            width: "100%", background: C.card, border: `1px dashed ${C.border}`, borderRadius: 16,
+            padding: "16px", cursor: weatherRefreshing ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10
+          }
+        },
+          React.createElement('span', { style: { fontSize: 20 } }, weatherRefreshing ? "⏳" : "🌤️"),
+          React.createElement('p', { style: { fontSize: 13, color: C.muted } }, weatherRefreshing ? "Wetter wird geladen…" : "Wetterdaten laden")
         )
       ),
       
@@ -3155,6 +3266,13 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
       fetchWeather().then(w => { if(w) setWeather(w); });
     }, []);
 
+    // ── Live-Wetter aktualisieren ───────────────────────────
+    const handleRefreshWeather = useCallback(async () => {
+      const w = await refreshWeather();
+      if (w) setWeather({ ...w });
+      return w;
+    }, []);
+
     // ── Gieß-Erinnerungs-Logik (Notification-Skeleton) ─────
     useEffect(() => {
       if (!loaded) return;
@@ -3205,6 +3323,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           plants, 
           weather, 
           onSelectPlant: id => { setSelectedPlant(id); setView("plants"); },
+          onRefreshWeather: handleRefreshWeather,
           onEditRoom: (id, data) => {
             const updated = rooms.map(r => r.id === id ? {...r, ...data} : r);
             saveRooms(updated);
