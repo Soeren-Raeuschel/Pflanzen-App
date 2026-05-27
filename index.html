@@ -1389,6 +1389,350 @@
     return status;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEU: Wasserbedarfsberechnung
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // NEU: Topfgrößen-basierte Wasserbedarf-Datenbank
+  // Jeder Eintrag definiert Schwellenwerte (Topfdurchmesser in cm) und dazugehörige
+  // Richtwerte für Wassermenge (ml) und Gießintervall (Tage) im Sommer (März–September).
+  // Der Wintersaisonfaktor reduziert Menge und verlängert Intervall.
+  //
+  // Struktur pro Art:
+  //   stufen: [ { maxDm, mlMin, mlMax, tagMin, tagMax, label } ]
+  //     maxDm    – gilt bis einschließlich diesem Durchmesser (letzter Eintrag = alles größer)
+  //     mlMin/Max – Wassermenge in ml pro Gießgang (Frühling/Sommer)
+  //     tagMin/Max – Gießintervall in Tagen (Frühling/Sommer)
+  //     label    – beschreibende Größenangabe
+  //   winterFaktor – Multiplikator auf mlMax und Intervallfaktor (>1 = mehr Tage)
+  //   standortFaktor – { Sonne, Halbschatten, Schatten, Innenraum }
+  //     Werte > 1: mehr/häufiger, < 1: weniger/seltener (relativ zum Basiswert)
+  //   hinweis – Saisonhinweis Text
+  const WASSERBEDARF_PROFIL = {
+    "Monstera": {
+      stufen: [
+        { maxDm: 15,  mlMin: 150,  mlMax: 250,  tagMin: 5,  tagMax: 7,  label: "Jungpflanze (12–15 cm)" },
+        { maxDm: 21,  mlMin: 300,  mlMax: 500,  tagMin: 7,  tagMax: 10, label: "Mittelgroß (17–21 cm)" },
+        { maxDm: 99,  mlMin: 700,  mlMax: 1200, tagMin: 10, tagMax: 14, label: "Groß (24–28 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.75, "Innenraum": 0.9 },
+      hinweis: "Im Herbst/Winter verlängert sich das Intervall auf 10–18 Tage — die Pflanze wächst langsamer.",
+    },
+    "Pothos": {
+      stufen: [
+        { maxDm: 13,  mlMin: 80,   mlMax: 150,  tagMin: 5,  tagMax: 7,  label: "Klein (bis 13 cm)" },
+        { maxDm: 18,  mlMin: 150,  mlMax: 280,  tagMin: 7,  tagMax: 10, label: "Mittel (14–18 cm)" },
+        { maxDm: 99,  mlMin: 300,  mlMax: 500,  tagMin: 10, tagMax: 12, label: "Groß (19 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.15, "Halbschatten": 1.0, "Schatten": 0.8, "Innenraum": 0.9 },
+      hinweis: "Im Winter alle 10–14 Tage gießen. Pothos verträgt leichte Trockenheit gut.",
+    },
+    "Ficus": {
+      stufen: [
+        { maxDm: 14,  mlMin: 100,  mlMax: 180,  tagMin: 5,  tagMax: 8,  label: "Klein (bis 14 cm)" },
+        { maxDm: 20,  mlMin: 200,  mlMax: 350,  tagMin: 7,  tagMax: 10, label: "Mittel (15–20 cm)" },
+        { maxDm: 99,  mlMin: 400,  mlMax: 700,  tagMin: 10, tagMax: 14, label: "Groß (21 cm+)" },
+      ],
+      winterFaktor: 1.6,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 0.85 },
+      hinweis: "Ficus reagiert empfindlich auf Standortwechsel. Im Winter sparsam gießen (alle 12–18 Tage).",
+    },
+    "Gummibaum": {
+      stufen: [
+        { maxDm: 14,  mlMin: 100,  mlMax: 180,  tagMin: 6,  tagMax: 9,  label: "Klein (bis 14 cm)" },
+        { maxDm: 21,  mlMin: 200,  mlMax: 380,  tagMin: 8,  tagMax: 12, label: "Mittel (15–21 cm)" },
+        { maxDm: 99,  mlMin: 450,  mlMax: 800,  tagMin: 12, tagMax: 16, label: "Groß (22 cm+)" },
+      ],
+      winterFaktor: 1.7,
+      standortFaktor: { "Sonne": 1.1, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 0.85 },
+      hinweis: "Im Winter reicht Gießen alle 14–21 Tage — Staunässe unbedingt vermeiden.",
+    },
+    "Palme": {
+      stufen: [
+        { maxDm: 14,  mlMin: 120,  mlMax: 220,  tagMin: 4,  tagMax: 6,  label: "Klein (bis 14 cm)" },
+        { maxDm: 21,  mlMin: 250,  mlMax: 450,  tagMin: 6,  tagMax: 9,  label: "Mittel (15–21 cm)" },
+        { maxDm: 99,  mlMin: 500,  mlMax: 900,  tagMin: 8,  tagMax: 12, label: "Groß (22 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.65, "Innenraum": 0.85 },
+      hinweis: "Palmen mögen gleichmäßige Feuchte. Im Winter Intervall auf 10–16 Tage verlängern.",
+    },
+    "Friedenslilie": {
+      stufen: [
+        { maxDm: 13,  mlMin: 100,  mlMax: 180,  tagMin: 5,  tagMax: 7,  label: "Klein (bis 13 cm)" },
+        { maxDm: 19,  mlMin: 200,  mlMax: 350,  tagMin: 6,  tagMax: 9,  label: "Mittel (14–19 cm)" },
+        { maxDm: 99,  mlMin: 400,  mlMax: 650,  tagMin: 8,  tagMax: 12, label: "Groß (20 cm+)" },
+      ],
+      winterFaktor: 1.4,
+      standortFaktor: { "Sonne": 1.1, "Halbschatten": 1.0, "Schatten": 0.85, "Innenraum": 0.9 },
+      hinweis: "Die Friedenslilie zeigt Trockenstress durch herabhängende Blätter. Im Winter alle 9–14 Tage.",
+    },
+    "Drachenbaum": {
+      stufen: [
+        { maxDm: 13,  mlMin: 60,   mlMax: 120,  tagMin: 7,  tagMax: 10, label: "Klein (bis 13 cm)" },
+        { maxDm: 19,  mlMin: 130,  mlMax: 250,  tagMin: 10, tagMax: 14, label: "Mittel (14–19 cm)" },
+        { maxDm: 99,  mlMin: 280,  mlMax: 500,  tagMin: 14, tagMax: 18, label: "Groß (20 cm+)" },
+      ],
+      winterFaktor: 1.8,
+      standortFaktor: { "Sonne": 1.1, "Halbschatten": 1.0, "Schatten": 0.75, "Innenraum": 0.85 },
+      hinweis: "Drachenbaum ist trockenheitsverträglich. Im Winter alle 18–28 Tage sparsam gießen.",
+    },
+    "Bogenhanf": {
+      stufen: [
+        { maxDm: 13,  mlMin: 40,   mlMax: 80,   tagMin: 14, tagMax: 21, label: "Klein (bis 13 cm)" },
+        { maxDm: 19,  mlMin: 80,   mlMax: 150,  tagMin: 14, tagMax: 21, label: "Mittel (14–19 cm)" },
+        { maxDm: 99,  mlMin: 160,  mlMax: 280,  tagMin: 21, tagMax: 28, label: "Groß (20 cm+)" },
+      ],
+      winterFaktor: 2.0,
+      standortFaktor: { "Sonne": 1.1, "Halbschatten": 1.0, "Schatten": 0.8, "Innenraum": 0.9 },
+      hinweis: "Bogenhanf ist extrem trockenheitsresistent. Im Winter nur alle 4–6 Wochen gießen.",
+    },
+    "Zamioculcas": {
+      stufen: [
+        { maxDm: 13,  mlMin: 50,   mlMax: 90,   tagMin: 14, tagMax: 21, label: "Klein (bis 13 cm)" },
+        { maxDm: 19,  mlMin: 90,   mlMax: 170,  tagMin: 14, tagMax: 21, label: "Mittel (14–19 cm)" },
+        { maxDm: 99,  mlMin: 180,  mlMax: 320,  tagMin: 21, tagMax: 28, label: "Groß (20 cm+)" },
+      ],
+      winterFaktor: 2.0,
+      standortFaktor: { "Sonne": 1.1, "Halbschatten": 1.0, "Schatten": 0.8, "Innenraum": 0.9 },
+      hinweis: "ZZ speichert Wasser in den Rhizomen. Im Winter reicht Gießen alle 4–6 Wochen.",
+    },
+    "Elefantenfuß": {
+      stufen: [
+        { maxDm: 13,  mlMin: 40,   mlMax: 70,   tagMin: 14, tagMax: 21, label: "Klein (bis 13 cm)" },
+        { maxDm: 19,  mlMin: 70,   mlMax: 130,  tagMin: 14, tagMax: 21, label: "Mittel (14–19 cm)" },
+        { maxDm: 99,  mlMin: 140,  mlMax: 250,  tagMin: 21, tagMax: 35, label: "Groß (20 cm+)" },
+      ],
+      winterFaktor: 2.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 0.9 },
+      hinweis: "Der Elefantenfuß speichert Wasser im Stamm. Im Winter max. alle 6–8 Wochen.",
+    },
+    "Sukkulente": {
+      stufen: [
+        { maxDm: 9,   mlMin: 15,   mlMax: 30,   tagMin: 10, tagMax: 14, label: "Miniatur (bis 9 cm)" },
+        { maxDm: 14,  mlMin: 30,   mlMax: 60,   tagMin: 10, tagMax: 14, label: "Klein (10–14 cm)" },
+        { maxDm: 99,  mlMin: 60,   mlMax: 120,  tagMin: 14, tagMax: 21, label: "Mittel/Groß (15 cm+)" },
+      ],
+      winterFaktor: 2.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.6, "Innenraum": 0.8 },
+      hinweis: "Im Winter nur alle 4–6 Wochen gießen — Sukkulenten brauchen eine Ruhephase.",
+    },
+    "Kaktus": {
+      stufen: [
+        { maxDm: 9,   mlMin: 10,   mlMax: 20,   tagMin: 14, tagMax: 21, label: "Miniatur (bis 9 cm)" },
+        { maxDm: 14,  mlMin: 20,   mlMax: 40,   tagMin: 14, tagMax: 21, label: "Klein (10–14 cm)" },
+        { maxDm: 99,  mlMin: 40,   mlMax: 80,   tagMin: 21, tagMax: 28, label: "Mittel/Groß (15 cm+)" },
+      ],
+      winterFaktor: 4.0,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.5, "Innenraum": 0.7 },
+      hinweis: "Von Oktober bis März kaum gießen (alle 6–8 Wochen). Kälte + Trockenheit fördert Blüte.",
+    },
+    "Aloe Vera": {
+      stufen: [
+        { maxDm: 12,  mlMin: 30,   mlMax: 60,   tagMin: 10, tagMax: 14, label: "Klein (bis 12 cm)" },
+        { maxDm: 18,  mlMin: 60,   mlMax: 120,  tagMin: 12, tagMax: 18, label: "Mittel (13–18 cm)" },
+        { maxDm: 99,  mlMin: 120,  mlMax: 220,  tagMin: 14, tagMax: 21, label: "Groß (19 cm+)" },
+      ],
+      winterFaktor: 2.0,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.65, "Innenraum": 0.85 },
+      hinweis: "Aloe Vera braucht komplett trockene Erde zwischen den Güssen. Im Winter alle 3–5 Wochen.",
+    },
+    "Orchidee": {
+      stufen: [
+        { maxDm: 10,  mlMin: 50,   mlMax: 80,   tagMin: 7,  tagMax: 10, label: "Klein (bis 10 cm)" },
+        { maxDm: 14,  mlMin: 80,   mlMax: 130,  tagMin: 7,  tagMax: 10, label: "Standard (11–14 cm)" },
+        { maxDm: 99,  mlMin: 130,  mlMax: 200,  tagMin: 10, tagMax: 14, label: "Groß (15 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 0.85, "Halbschatten": 1.0, "Schatten": 0.8, "Innenraum": 1.0 },
+      hinweis: "Orchideen lieber tauchen statt gießen (5 Min). Im Winter alle 10–16 Tage.",
+    },
+    "Basilikum": {
+      stufen: [
+        { maxDm: 11,  mlMin: 100,  mlMax: 180,  tagMin: 1,  tagMax: 2,  label: "Klein (bis 11 cm)" },
+        { maxDm: 16,  mlMin: 180,  mlMax: 320,  tagMin: 2,  tagMax: 3,  label: "Mittel (12–16 cm)" },
+        { maxDm: 99,  mlMin: 320,  mlMax: 550,  tagMin: 2,  tagMax: 4,  label: "Groß (17 cm+)" },
+      ],
+      winterFaktor: 1.3,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 1.0 },
+      hinweis: "Basilikum braucht gleichmäßig feuchte Erde — nie austrocknen lassen. Im Winter etwas weniger.",
+    },
+    "Minze": {
+      stufen: [
+        { maxDm: 11,  mlMin: 90,   mlMax: 160,  tagMin: 1,  tagMax: 2,  label: "Klein (bis 11 cm)" },
+        { maxDm: 16,  mlMin: 160,  mlMax: 300,  tagMin: 2,  tagMax: 3,  label: "Mittel (12–16 cm)" },
+        { maxDm: 99,  mlMin: 300,  mlMax: 500,  tagMin: 2,  tagMax: 4,  label: "Groß (17 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.75, "Innenraum": 0.9 },
+      hinweis: "Minze liebt Feuchtigkeit, aber keine Staunässe. Im Winter bei ~5°C kaum gießen.",
+    },
+    "Thymian": {
+      stufen: [
+        { maxDm: 11,  mlMin: 40,   mlMax: 70,   tagMin: 4,  tagMax: 7,  label: "Klein (bis 11 cm)" },
+        { maxDm: 16,  mlMin: 70,   mlMax: 130,  tagMin: 5,  tagMax: 8,  label: "Mittel (12–16 cm)" },
+        { maxDm: 99,  mlMin: 130,  mlMax: 220,  tagMin: 7,  tagMax: 10, label: "Groß (17 cm+)" },
+      ],
+      winterFaktor: 1.8,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.6, "Innenraum": 0.85 },
+      hinweis: "Thymian ist trockenheitsliebend — lieber zu wenig als zu viel. Im Winter alle 10–16 Tage.",
+    },
+    "Lavendel": {
+      stufen: [
+        { maxDm: 12,  mlMin: 50,   mlMax: 90,   tagMin: 5,  tagMax: 8,  label: "Klein (bis 12 cm)" },
+        { maxDm: 18,  mlMin: 90,   mlMax: 170,  tagMin: 7,  tagMax: 10, label: "Mittel (13–18 cm)" },
+        { maxDm: 99,  mlMin: 170,  mlMax: 300,  tagMin: 10, tagMax: 14, label: "Groß (19 cm+)" },
+      ],
+      winterFaktor: 2.0,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.6, "Innenraum": 0.8 },
+      hinweis: "Lavendel verträgt Trockenheit gut. Im Winter alle 2–4 Wochen, Staunässe ist tödlich.",
+    },
+    "Tomate": {
+      stufen: [
+        { maxDm: 15,  mlMin: 200,  mlMax: 350,  tagMin: 1,  tagMax: 2,  label: "Jungpflanze (bis 15 cm)" },
+        { maxDm: 22,  mlMin: 400,  mlMax: 700,  tagMin: 1,  tagMax: 2,  label: "Mittel (16–22 cm)" },
+        { maxDm: 99,  mlMin: 700,  mlMax: 1500, tagMin: 1,  tagMax: 1,  label: "Groß (23 cm+)" },
+      ],
+      winterFaktor: 1.0, // Tomaten im Winter kaum relevant
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.6, "Innenraum": 0.8 },
+      hinweis: "Tomaten müssen täglich gegossen werden — bei Hitze sogar zweimal. Gleichmäßige Feuchtigkeit verhindert Blütenendenfäule.",
+    },
+    "Paprika": {
+      stufen: [
+        { maxDm: 14,  mlMin: 150,  mlMax: 280,  tagMin: 1,  tagMax: 2,  label: "Klein (bis 14 cm)" },
+        { maxDm: 20,  mlMin: 280,  mlMax: 500,  tagMin: 1,  tagMax: 2,  label: "Mittel (15–20 cm)" },
+        { maxDm: 99,  mlMin: 500,  mlMax: 900,  tagMin: 1,  tagMax: 2,  label: "Groß (21 cm+)" },
+      ],
+      winterFaktor: 1.0,
+      standortFaktor: { "Sonne": 1.25, "Halbschatten": 1.0, "Schatten": 0.65, "Innenraum": 0.85 },
+      hinweis: "Paprika braucht gleichmäßige Feuchtigkeit — weder austrocknen noch Staunässe.",
+    },
+    "Zitrone": {
+      stufen: [
+        { maxDm: 16,  mlMin: 150,  mlMax: 250,  tagMin: 5,  tagMax: 7,  label: "Jung (bis 16 cm)" },
+        { maxDm: 22,  mlMin: 250,  mlMax: 450,  tagMin: 6,  tagMax: 9,  label: "Mittel (17–22 cm)" },
+        { maxDm: 99,  mlMin: 450,  mlMax: 800,  tagMin: 7,  tagMax: 12, label: "Groß (23 cm+)" },
+      ],
+      winterFaktor: 1.7,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.6, "Innenraum": 0.85 },
+      hinweis: "Zitruspflanzen im Winter alle 10–18 Tage — kalte Überwinterung reduziert den Bedarf stark.",
+    },
+    "Olivenbaum": {
+      stufen: [
+        { maxDm: 16,  mlMin: 80,   mlMax: 150,  tagMin: 7,  tagMax: 10, label: "Jung (bis 16 cm)" },
+        { maxDm: 24,  mlMin: 150,  mlMax: 300,  tagMin: 8,  tagMax: 12, label: "Mittel (17–24 cm)" },
+        { maxDm: 99,  mlMin: 300,  mlMax: 550,  tagMin: 10, tagMax: 16, label: "Groß (25 cm+)" },
+      ],
+      winterFaktor: 2.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.6, "Innenraum": 0.8 },
+      hinweis: "Olivenbaum ist sehr trockenheitstolerant. Im Winter kaum gießen (alle 3–5 Wochen).",
+    },
+    "Efeu": {
+      stufen: [
+        { maxDm: 12,  mlMin: 80,   mlMax: 140,  tagMin: 5,  tagMax: 7,  label: "Klein (bis 12 cm)" },
+        { maxDm: 18,  mlMin: 140,  mlMax: 250,  tagMin: 6,  tagMax: 9,  label: "Mittel (13–18 cm)" },
+        { maxDm: 99,  mlMin: 250,  mlMax: 450,  tagMin: 8,  tagMax: 12, label: "Groß (19 cm+)" },
+      ],
+      winterFaktor: 1.6,
+      standortFaktor: { "Sonne": 1.15, "Halbschatten": 1.0, "Schatten": 0.8, "Innenraum": 0.9 },
+      hinweis: "Efeu mag gleichmäßige Feuchte, verträgt aber kurze Trockenheit. Im Winter alle 10–16 Tage.",
+    },
+    "Bonsai": {
+      stufen: [
+        { maxDm: 10,  mlMin: 50,   mlMax: 90,   tagMin: 1,  tagMax: 2,  label: "Klein (bis 10 cm)" },
+        { maxDm: 16,  mlMin: 90,   mlMax: 160,  tagMin: 2,  tagMax: 3,  label: "Mittel (11–16 cm)" },
+        { maxDm: 99,  mlMin: 160,  mlMax: 280,  tagMin: 2,  tagMax: 4,  label: "Groß (17 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 0.8 },
+      hinweis: "Bonsai täglich auf Feuchtigkeit prüfen — flache Schalen trocknen extrem schnell. Im Winter je nach Baumart anpassen.",
+    },
+    "Rose": {
+      stufen: [
+        { maxDm: 15,  mlMin: 150,  mlMax: 280,  tagMin: 3,  tagMax: 5,  label: "Klein (bis 15 cm)" },
+        { maxDm: 22,  mlMin: 280,  mlMax: 500,  tagMin: 4,  tagMax: 7,  label: "Mittel (16–22 cm)" },
+        { maxDm: 99,  mlMin: 500,  mlMax: 900,  tagMin: 5,  tagMax: 8,  label: "Groß (23 cm+)" },
+      ],
+      winterFaktor: 2.0,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.65, "Innenraum": 0.8 },
+      hinweis: "Rosen im Winter bei Frost kaum gießen — nur frostfreie Tage nutzen (alle 2–4 Wochen).",
+    },
+    "Andere": {
+      stufen: [
+        { maxDm: 13,  mlMin: 80,   mlMax: 150,  tagMin: 5,  tagMax: 8,  label: "Klein (bis 13 cm)" },
+        { maxDm: 20,  mlMin: 150,  mlMax: 300,  tagMin: 7,  tagMax: 10, label: "Mittel (14–20 cm)" },
+        { maxDm: 99,  mlMin: 300,  mlMax: 550,  tagMin: 9,  tagMax: 14, label: "Groß (21 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.75, "Innenraum": 0.9 },
+      hinweis: "Im Herbst/Winter Gießintervall um ca. 50% verlängern und Menge leicht reduzieren.",
+    },
+  };
+
+  // NEU: Hauptfunktion Wasserbedarfsberechnung
+  // Gibt Wassermenge (ml) UND Gießintervall (Tage) zurück — jeweils für Sommer und Winter.
+  // Parameter:
+  //   durchmesser  – Topfdurchmesser in cm
+  //   pflanzenart  – Schlüssel aus WASSERBEDARF_PROFIL
+  //   standort     – "Sonne" | "Halbschatten" | "Schatten" | "Innenraum"
+  //   saison       – "sommer" | "winter" (optional, default: automatisch nach Monat)
+  function berechneWasserbedarf(durchmesser, pflanzenart, standort, saison) {
+    if (!durchmesser || durchmesser <= 0) return null;
+
+    // Saison automatisch ermitteln wenn nicht übergeben (März–Sept = Sommer)
+    if (!saison) {
+      const monat = new Date().getMonth() + 1; // 1–12
+      saison = (monat >= 3 && monat <= 9) ? "sommer" : "winter";
+    }
+
+    const profil = WASSERBEDARF_PROFIL[pflanzenart] || WASSERBEDARF_PROFIL["Andere"];
+
+    // Passende Topfgrößen-Stufe finden
+    const stufe = profil.stufen.find(s => durchmesser <= s.maxDm) || profil.stufen[profil.stufen.length - 1];
+
+    // Standortfaktor anwenden
+    const sFaktor = profil.standortFaktor[standort] || 1.0;
+
+    // Basis-Wassermenge (Mittelwert der Stufe × Standortfaktor)
+    const mlBasisMin = Math.round(stufe.mlMin * sFaktor);
+    const mlBasisMax = Math.round(stufe.mlMax * sFaktor);
+
+    // Basis-Intervall
+    let tagMin = stufe.tagMin;
+    let tagMax = stufe.tagMax;
+    let mlMin = mlBasisMin;
+    let mlMax = mlBasisMax;
+
+    // Winter-Anpassung
+    if (saison === "winter") {
+      mlMin  = Math.round(mlBasisMin * 0.7);  // ~30% weniger
+      mlMax  = Math.round(mlBasisMax * 0.75);
+      tagMin = Math.round(tagMin * profil.winterFaktor);
+      tagMax = Math.round(tagMax * profil.winterFaktor);
+    }
+
+    return {
+      mlMin, mlMax,
+      tagMin, tagMax,
+      label: stufe.label,
+      saison,
+      hinweis: profil.hinweis,
+      // Einzelwert für Rückwärtskompatibilität (Mitte des Bereichs)
+      ml: Math.round((mlMin + mlMax) / 2),
+    };
+  }
+
+  // NEU: Hilfsfunktion — Standort aus Raumobjekt ableiten für Gießplan
+  function getStandortFromRoom(room) {
+    if (!room) return "Innenraum";
+    const loc = getLocationFromRoom(room);
+    if (loc === "balcony" || loc === "garden") return "Sonne";
+    if (loc === "bathroom") return "Schatten";
+    return "Innenraum";
+  }
+
   function needsWaterAdaptive(plant, rooms) {
     if (!plant || !plant.type) return false;
     if (!plant.room_id || !rooms || rooms.length === 0) return needsWater(plant);
@@ -1421,11 +1765,12 @@
   // ── BottomNav ──────────────────────────────────────────
   function BottomNav({ active, onChange, onAdd }) {
     const tabs = [
-      { id: "home", icon: "🏠", label: "Heute" },
-      { id: "plants", icon: "🪴", label: "Pflanzen" },
-      { id: "discover", icon: "✨", label: "Entdecken" },
-      { id: "rooms", icon: "🚪", label: "Räume" },
-      { id: "settings", icon: "⚙️", label: "Einstellungen" }
+      { id: "home",      icon: "🏠", label: "Heute" },
+      { id: "plants",    icon: "🪴", label: "Pflanzen" },
+      { id: "giessplan", icon: "💧", label: "Gießplan" },
+      { id: "discover",  icon: "✨", label: "Entdecken" },
+      { id: "rooms",     icon: "🚪", label: "Räume" },
+      { id: "settings",  icon: "⚙️", label: "Einst." }
     ];
     
     return React.createElement('div', {
@@ -1442,11 +1787,19 @@
         display: "flex", 
         alignItems: "center", 
         justifyContent: "space-between", 
-        padding: `8px 16px calc(8px + env(safe-area-inset-bottom, 0px))`, 
+        padding: `8px 8px calc(8px + env(safe-area-inset-bottom, 0px))`, 
         zIndex: 100 
       }
     },
-      React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "space-around" } },
+      React.createElement('div', {
+        style: {
+          display: "flex", alignItems: "center", flex: 1,
+          overflowX: "auto", gap: 0,
+          // hide scrollbar cross-browser
+          scrollbarWidth: "none", msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch"
+        }
+      },
         ...tabs.map(tab =>
           React.createElement('button', {
             key: tab.id, 
@@ -1460,17 +1813,18 @@
               flexDirection: "column", 
               alignItems: "center", 
               gap: 2, 
-              padding: "8px 10px",
+              padding: "6px 8px",
               borderRadius: 12,
               background: active === tab.id ? C.accentLight : "transparent",
               transition: "all 0.2s ease",
-              minWidth: 56
+              minWidth: 52,
+              flexShrink: 0
             }
           },
-            React.createElement('span', { style: { fontSize: 20 } }, tab.icon),
+            React.createElement('span', { style: { fontSize: 18 } }, tab.icon),
             React.createElement('span', { 
               style: { 
-                fontSize: 10, 
+                fontSize: 9, 
                 fontWeight: 500, 
                 color: active === tab.id ? C.accent : C.muted,
                 whiteSpace: "nowrap"
@@ -2639,6 +2993,118 @@ Nur JSON, keine Erklärungen.`;
               )
           ),
 
+          // NEU: Topfdurchmesser & Wasserbedarf-Sektion
+          React.createElement(SectionLabel, null, "🪣 Topf & Wasserbedarf"),
+          React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}`, marginBottom: 4 } },
+            // Topfdurchmesser Input
+            React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } },
+              React.createElement('div', null,
+                React.createElement('p', { style: { fontSize: 13, fontWeight: 500, color: C.text } }, "Topfdurchmesser"),
+                React.createElement('p', { style: { fontSize: 11, color: C.muted } }, "Für genaue Mengenberechnung")
+              ),
+              React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 6 } },
+                React.createElement('input', {
+                  type: "number",
+                  min: 3, max: 100,
+                  value: plant.topf_durchmesser || "",
+                  placeholder: "cm",
+                  onChange: e => {
+                    const val = parseInt(e.target.value);
+                    // NEU: Topfdurchmesser direkt im Plant-Objekt + localStorage speichern
+                    onUpdatePlant(plant.id, { topf_durchmesser: (val > 0 && val <= 100) ? val : null });
+                  },
+                  style: {
+                    width: 68, background: C.inputBg, border: `1px solid ${C.accent}60`,
+                    borderRadius: 10, padding: "8px 10px", fontSize: 14, color: C.text,
+                    outline: "none", textAlign: "center", WebkitAppearance: "none"
+                  }
+                }),
+                React.createElement('span', { style: { fontSize: 13, color: C.muted } }, "cm")
+              )
+            ),
+            // Standort-Dropdown für Wasserberechnung
+            React.createElement('div', { style: { marginBottom: 12 } },
+              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Standort (für Berechnung)"),
+              React.createElement('select', {
+                value: plant.wasser_standort || "Innenraum",
+                onChange: e => {
+                  // NEU: Standort im Plant-Objekt + localStorage speichern
+                  onUpdatePlant(plant.id, { wasser_standort: e.target.value });
+                },
+                style: {
+                  width: "100%", background: C.inputBg, border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: "9px 12px", fontSize: 13, color: C.text,
+                  outline: "none", WebkitAppearance: "none", cursor: "pointer"
+                }
+              },
+                ["Innenraum", "Halbschatten", "Sonne", "Schatten"].map(s =>
+                  React.createElement('option', { key: s, value: s }, s)
+                )
+              )
+            ),
+            // NEU: Berechnetes Ergebnis anzeigen
+            (() => {
+              if (!plant.topf_durchmesser) {
+                return React.createElement('div', {
+                  style: { background: C.inputBg, borderRadius: 10, padding: "10px 12px", textAlign: "center" }
+                },
+                  React.createElement('p', { style: { fontSize: 12, color: C.muted, fontStyle: "italic" } },
+                    "Topfdurchmesser eingeben für Wassermengen-Berechnung"
+                  )
+                );
+              }
+              const ergebnis = berechneWasserbedarf(plant.topf_durchmesser, plant.type, plant.wasser_standort || "Innenraum");
+              if (!ergebnis) return null;
+              const isSommer = ergebnis.saison === "sommer";
+              const formatMl = ml => ml >= 1000 ? `${(ml/1000).toFixed(1)} L` : `${ml} ml`;
+              return React.createElement('div', {
+                style: { background: C.accentLight, borderRadius: 10, padding: "14px", border: `1px solid ${C.accent}40` }
+              },
+                // Saison-Badge + Kopfzeile
+                React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 } },
+                  React.createElement('div', null,
+                    React.createElement('p', { style: { fontSize: 12, color: C.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" } }, "💧 Wasserbedarf"),
+                    React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 2 } }, ergebnis.label)
+                  ),
+                  React.createElement('span', {
+                    style: {
+                      fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 8,
+                      background: isSommer ? "#FFF3CD" : "#D6EAF8",
+                      color: isSommer ? "#856404" : "#1A5276"
+                    }
+                  }, isSommer ? "☀️ Frühjahr/Sommer" : "❄️ Herbst/Winter")
+                ),
+                // Menge + Intervall nebeneinander
+                React.createElement('div', { style: { display: "flex", gap: 10, marginBottom: 10 } },
+                  React.createElement('div', {
+                    style: { flex: 1, background: C.card, borderRadius: 8, padding: "10px 12px", textAlign: "center", border: `1px solid ${C.border}` }
+                  },
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted, marginBottom: 4 } }, "Wassermenge"),
+                    React.createElement('p', { style: { fontSize: 17, fontWeight: 700, color: C.accent } },
+                      `${formatMl(ergebnis.mlMin)} – ${formatMl(ergebnis.mlMax)}`
+                    ),
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted, marginTop: 2 } }, "pro Gießgang")
+                  ),
+                  React.createElement('div', {
+                    style: { flex: 1, background: C.card, borderRadius: 8, padding: "10px 12px", textAlign: "center", border: `1px solid ${C.border}` }
+                  },
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted, marginBottom: 4 } }, "Gießintervall"),
+                    React.createElement('p', { style: { fontSize: 17, fontWeight: 700, color: C.text } },
+                      ergebnis.tagMin === ergebnis.tagMax
+                        ? `alle ${ergebnis.tagMin} Tage`
+                        : `alle ${ergebnis.tagMin}–${ergebnis.tagMax} Tage`
+                    ),
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted, marginTop: 2 } }, "Richtwert")
+                  )
+                ),
+                // Saisonhinweis
+                React.createElement('div', { style: { background: C.card, borderRadius: 8, padding: "8px 10px", border: `1px solid ${C.border}` } },
+                  React.createElement('p', { style: { fontSize: 11, color: C.muted, lineHeight: 1.5 } }, ergebnis.hinweis)
+                )
+              );
+            })()
+          ),
+
           // Pflegetipp
           React.createElement(SectionLabel, null, "Pflegetipp"),
           React.createElement('div', { style: { background: C.card, borderRadius: 14, padding: "14px 16px", border: `1px solid ${C.border}` } },
@@ -2854,6 +3320,8 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
     const [fertilizerInterval, setFertilizerInterval] = useState(14);
     const [fertilizerType, setFertilizerType] = useState("");
     const [roomId, setRoomId] = useState("");
+    const [topfDurchmesser, setTopfDurchmesser] = useState("");      // NEU: Topfdurchmesser
+    const [wasserStandort, setWasserStandort] = useState("Innenraum"); // NEU: Standort für Wasserbedarf
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [matchInfo, setMatchInfo] = useState(null);
@@ -2939,7 +3407,9 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           fertilizer_interval: fertilizerEnabled ? fertilizerInterval : (aiFertilizerInterval > 0 ? aiFertilizerInterval : 0),
           fertilizer_type: fertilizerEnabled ? fertilizerType : (aiData.fertilizer_type || aiData.fertilizer || ""),
           last_fertilized_date: (fertilizerEnabled || aiFertilizerInterval > 0) ? new Date().toISOString() : null,
-          room_id: roomId || null
+          room_id: roomId || null,
+          topf_durchmesser: topfDurchmesser ? parseInt(topfDurchmesser) : null,  // NEU
+          wasser_standort: wasserStandort,                                          // NEU
         };
         onAdd(newPlant);
       } catch (e) {
@@ -2979,7 +3449,9 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           watering_interval: fallbackWateringInterval,
           fertilizer_type: fertilizerEnabled ? fertilizerType : fallbackData.fertilizer_type,
           last_fertilized_date: (fertilizerEnabled || fallbackData.fertilizer_interval > 0) ? new Date().toISOString() : null,
-          room_id: roomId || null
+          room_id: roomId || null,
+          topf_durchmesser: topfDurchmesser ? parseInt(topfDurchmesser) : null,  // NEU
+          wasser_standort: wasserStandort,                                          // NEU
         };
         onAdd(newPlant);
       } finally {
@@ -3001,7 +3473,9 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         fertilizer_interval: fertilizerEnabled ? fertilizerInterval : 0,
         fertilizer_type: fertilizerEnabled ? fertilizerType : "",
         last_fertilized_date: fertilizerEnabled ? new Date().toISOString() : null,
-        room_id: roomId || null
+        room_id: roomId || null,
+        topf_durchmesser: topfDurchmesser ? parseInt(topfDurchmesser) : null,  // NEU
+        wasser_standort: wasserStandort,                                          // NEU
       };
       onAdd(newPlant);
     };
@@ -3173,6 +3647,89 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
             )
           )
         ),
+        // NEU: Topf & Wasserbedarf-Sektion
+        React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}` } },
+          React.createElement('p', { style: { fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 14 } }, "🪣 Topf & Wasserbedarf (optional)"),
+          // Topfdurchmesser
+          React.createElement('div', { style: { marginBottom: 12 } },
+            React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Topfdurchmesser"),
+            React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 8 } },
+              React.createElement('input', {
+                type: "number", min: 3, max: 100,
+                value: topfDurchmesser,
+                placeholder: "z.B. 15",
+                onChange: e => setTopfDurchmesser(e.target.value),
+                style: { ...inputStyle, padding: "10px 14px", WebkitAppearance: "none" }
+              }),
+              React.createElement('span', { style: { fontSize: 13, color: C.muted, flexShrink: 0 } }, "cm")
+            )
+          ),
+          // Standort-Dropdown
+          React.createElement('div', { style: { marginBottom: 14 } },
+            React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Standort"),
+            React.createElement('select', {
+              value: wasserStandort,
+              onChange: e => setWasserStandort(e.target.value),
+              style: { ...inputStyle, padding: "10px 14px", cursor: "pointer" }
+            },
+              ["Innenraum", "Halbschatten", "Sonne", "Schatten"].map(s =>
+                React.createElement('option', { key: s, value: s }, s)
+              )
+            )
+          ),
+          // Live-Vorschau der Berechnung
+          (() => {
+            const dm = parseInt(topfDurchmesser);
+            if (!dm || dm < 3) {
+              return React.createElement('div', {
+                style: { background: C.bg, borderRadius: 10, padding: "10px 12px", textAlign: "center", border: `1px dashed ${C.border}` }
+              },
+                React.createElement('p', { style: { fontSize: 12, color: C.muted, fontStyle: "italic" } },
+                  "Durchmesser eingeben → Vorschau erscheint hier"
+                )
+              );
+            }
+            const ergebnis = berechneWasserbedarf(dm, type, wasserStandort);
+            if (!ergebnis) return null;
+            const fmt = ml => ml >= 1000 ? `${(ml/1000).toFixed(1)} L` : `${ml} ml`;
+            const isSommer = ergebnis.saison === "sommer";
+            return React.createElement('div', {
+              style: { background: C.accentLight, borderRadius: 10, padding: "12px 14px", border: `1px solid ${C.accent}40` }
+            },
+              React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } },
+                React.createElement('p', { style: { fontSize: 11, fontWeight: 600, color: C.accent, textTransform: "uppercase", letterSpacing: "0.06em" } }, "💧 Vorschau"),
+                React.createElement('span', {
+                  style: {
+                    fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 6,
+                    background: isSommer ? "#FFF3CD" : "#D6EAF8",
+                    color: isSommer ? "#856404" : "#1A5276"
+                  }
+                }, isSommer ? "☀️ Sommer" : "❄️ Winter")
+              ),
+              React.createElement('p', { style: { fontSize: 11, color: C.muted, marginBottom: 8 } }, ergebnis.label),
+              React.createElement('div', { style: { display: "flex", gap: 8 } },
+                React.createElement('div', {
+                  style: { flex: 1, background: C.card, borderRadius: 8, padding: "8px 10px", textAlign: "center" }
+                },
+                  React.createElement('p', { style: { fontSize: 10, color: C.muted } }, "Menge"),
+                  React.createElement('p', { style: { fontSize: 13, fontWeight: 700, color: C.accent } },
+                    `${fmt(ergebnis.mlMin)}–${fmt(ergebnis.mlMax)}`
+                  )
+                ),
+                React.createElement('div', {
+                  style: { flex: 1, background: C.card, borderRadius: 8, padding: "8px 10px", textAlign: "center" }
+                },
+                  React.createElement('p', { style: { fontSize: 10, color: C.muted } }, "Intervall"),
+                  React.createElement('p', { style: { fontSize: 13, fontWeight: 700, color: C.text } },
+                    ergebnis.tagMin === ergebnis.tagMax
+                      ? `alle ${ergebnis.tagMin} T.`
+                      : `alle ${ergebnis.tagMin}–${ergebnis.tagMax} T.`
+                  )
+                )
+              )
+            );
+          })()
+        ),
         // Submit buttons
         React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10 } },
           React.createElement('button', {
@@ -3207,6 +3764,153 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           }, !getApiKey() ? "Manuell hinzufügen (kein API-Key)" : "Manuell hinzufügen")
         )
       )
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEU: GiessplanView — Übersicht aller Pflanzen mit Wasserbedarf
+  // ═══════════════════════════════════════════════════════════════════════════
+  function GiessplanView({ plants, rooms, onUpdatePlant, onSelect }) {
+    // NEU: Lokale State für schnelle Inline-Bearbeitung des Durchmessers
+    const [editingId, setEditingId] = React.useState(null);
+    const [editVal, setEditVal] = React.useState("");
+
+    const saveEdit = (plant) => {
+      const val = parseInt(editVal);
+      // NEU: Aktualisierung im Plant-Objekt → automatisch in localStorage via onUpdatePlant
+      onUpdatePlant(plant.id, { topf_durchmesser: (val > 0 && val <= 100) ? val : null });
+      setEditingId(null);
+    };
+
+    return React.createElement('div', {
+      style: { padding: `calc(52px + env(safe-area-inset-top,0px)) 20px 20px`, maxWidth: 430, margin: "0 auto", paddingBottom: 110 }
+    },
+      // Header
+      React.createElement('div', { style: { marginBottom: 24 } },
+        React.createElement('h1', { style: { fontFamily: "'Cormorant Garamond'", fontSize: 34, fontWeight: 500, color: C.text, lineHeight: 1.1 } }, "Gießplan 💧"),
+        React.createElement('p', { style: { fontSize: 14, color: C.muted, marginTop: 4 } }, "Empfohlene Wassermenge pro Pflanze")
+      ),
+
+      // Erklärung
+      React.createElement('div', {
+        style: { background: C.accentLight, borderRadius: 14, padding: "12px 14px", marginBottom: 20, border: `1px solid ${C.accent}30` }
+      },
+        React.createElement('p', { style: { fontSize: 12, color: C.accent, lineHeight: 1.6 } },
+          "💡 Die Wassermenge basiert auf Topfdurchmesser, Pflanzenart und Standort. " +
+          "Trage den Durchmesser ein, um eine Empfehlung zu erhalten."
+        )
+      ),
+
+      // Pflanzenliste
+      plants.length === 0
+        ? React.createElement('div', { style: { textAlign: "center", paddingTop: 40 } },
+            React.createElement('p', { style: { fontSize: 32 } }, "🌱"),
+            React.createElement('p', { style: { fontSize: 16, color: C.muted, marginTop: 12 } }, "Noch keine Pflanzen vorhanden.")
+          )
+        : React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
+            plants.map((plant, idx) => {
+              const room = rooms.find(r => r.id === plant.room_id);
+              const standort = plant.wasser_standort || getStandortFromRoom(room);
+              const ergebnis = plant.topf_durchmesser
+                ? berechneWasserbedarf(plant.topf_durchmesser, plant.type, standort)
+                : null;
+              const isEditing = editingId === plant.id;
+
+              return React.createElement('div', {
+                key: plant.id,
+                className: `anim-fade-up card-delay-${Math.min(idx+1,5)}`,
+                style: {
+                  background: C.card, borderRadius: 18, padding: "16px",
+                  border: `1px solid ${ergebnis ? C.accent + "40" : C.border}`,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                }
+              },
+                // Obere Zeile: Icon + Name + Ergebnis
+                React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 10 } },
+                  React.createElement('button', {
+                    onClick: () => onSelect(plant.id),
+                    style: { background: "none", border: "none", padding: 0, cursor: "pointer" }
+                  },
+                    React.createElement(PlantSvgIcon, { type: getSvgType(plant), size: 44 })
+                  ),
+                  React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+                    React.createElement('p', { style: { fontSize: 15, fontWeight: 600, color: C.text } }, getDisplayName(plant)),
+                    React.createElement('p', { style: { fontSize: 12, color: C.muted } },
+                      plant.type + (room ? ` · ${room.name}` : "") + ` · ${standort}`
+                    )
+                  ),
+                  // NEU: Ergebnisanzeige rechts — Bereich statt Einzelwert
+                  ergebnis
+                    ? React.createElement('div', { style: { textAlign: "right", flexShrink: 0, maxWidth: 110 } },
+                        React.createElement('p', { style: { fontSize: 13, fontWeight: 700, color: C.accent, lineHeight: 1.2 } },
+                          (() => {
+                            const fmt = ml => ml >= 1000 ? `${(ml/1000).toFixed(1)}L` : `${ml}ml`;
+                            return `${fmt(ergebnis.mlMin)}–${fmt(ergebnis.mlMax)}`;
+                          })()
+                        ),
+                        React.createElement('p', { style: { fontSize: 10, color: C.muted, marginTop: 1 } },
+                          ergebnis.tagMin === ergebnis.tagMax
+                            ? `alle ${ergebnis.tagMin} Tage`
+                            : `alle ${ergebnis.tagMin}–${ergebnis.tagMax} Tage`
+                        ),
+                        React.createElement('span', {
+                          style: {
+                            display: "inline-block", marginTop: 3,
+                            fontSize: 9, fontWeight: 600, padding: "2px 5px", borderRadius: 5,
+                            background: ergebnis.saison === "sommer" ? "#FFF3CD" : "#D6EAF8",
+                            color: ergebnis.saison === "sommer" ? "#856404" : "#1A5276"
+                          }
+                        }, ergebnis.saison === "sommer" ? "☀️ Sommer" : "❄️ Winter")
+                      )
+                    : React.createElement('div', {
+                        style: { background: C.inputBg, borderRadius: 8, padding: "6px 10px", flexShrink: 0 }
+                      },
+                        React.createElement('p', { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap" } }, "? ml")
+                      )
+                ),
+
+                // Untere Zeile: Topfdurchmesser editieren
+                React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 8 } },
+                  React.createElement('span', { style: { fontSize: 14 } }, "🪴"),
+                  React.createElement('p', { style: { fontSize: 12, color: C.muted, flex: 1 } }, "Topfdurchmesser:"),
+                  isEditing
+                    ? React.createElement(React.Fragment, null,
+                        React.createElement('input', {
+                          type: "number", autoFocus: true,
+                          value: editVal, min: 3, max: 100,
+                          onChange: e => setEditVal(e.target.value),
+                          onKeyDown: e => { if (e.key === "Enter") saveEdit(plant); if (e.key === "Escape") setEditingId(null); },
+                          style: {
+                            width: 58, background: C.inputBg, border: `1px solid ${C.accent}`,
+                            borderRadius: 8, padding: "5px 8px", fontSize: 14, color: C.text,
+                            outline: "none", textAlign: "center", WebkitAppearance: "none"
+                          }
+                        }),
+                        React.createElement('span', { style: { fontSize: 11, color: C.muted } }, "cm"),
+                        React.createElement('button', {
+                          onClick: () => saveEdit(plant),
+                          style: { background: C.accent, color: "#fff", border: "none", borderRadius: 7, padding: "5px 9px", cursor: "pointer", fontSize: 13 }
+                        }, "✓"),
+                        React.createElement('button', {
+                          onClick: () => setEditingId(null),
+                          style: { background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.text }
+                        }, "✕")
+                      )
+                    : React.createElement('button', {
+                        onClick: () => { setEditingId(plant.id); setEditVal(plant.topf_durchmesser || ""); },
+                        style: {
+                          background: plant.topf_durchmesser ? C.accentLight : C.inputBg,
+                          border: `1px solid ${plant.topf_durchmesser ? C.accent + "50" : C.border}`,
+                          borderRadius: 8, padding: "5px 12px", cursor: "pointer",
+                          fontSize: 13, color: plant.topf_durchmesser ? C.accent : C.muted, fontWeight: 500
+                        }
+                      },
+                        plant.topf_durchmesser ? `${plant.topf_durchmesser} cm ✏️` : "+ Eingeben"
+                      )
+                )
+              );
+            })
+          )
     );
   }
 
@@ -3318,6 +4022,12 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
       React.createElement('div', { style: { maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, paddingBottom: 90 } },
         view === "home" && React.createElement(HomeView, { plants, rooms, onWater: waterPlant, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
         view === "plants" && React.createElement(PlantsView, { plants, rooms, onSelect: setSelectedPlant, onAdd: () => setShowAdd(true) }),
+        // NEU: Gießplan-Tab mit Wasserbedarfsberechnung
+        view === "giessplan" && React.createElement(GiessplanView, {
+          plants, rooms,
+          onUpdatePlant: updatePlant,
+          onSelect: id => { setSelectedPlant(id); }
+        }),
         view === "rooms" && React.createElement(RoomView, { 
           rooms, 
           plants, 
@@ -3337,7 +4047,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         }),
         view === "discover" && React.createElement(DiscoverView),
         view === "settings" && React.createElement(SettingsView),
-        React.createElement(BottomNav, { active: view, onChange: setView, onAdd: (view === "settings" || view === "rooms" || view === "discover") ? null : () => setShowAdd(true) })
+        React.createElement(BottomNav, { active: view, onChange: setView, onAdd: (view === "settings" || view === "rooms" || view === "giessplan" || view === "discover") ? null : () => setShowAdd(true) })
       ),
       toast && React.createElement('div', {
         style: {
