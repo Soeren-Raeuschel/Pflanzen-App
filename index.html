@@ -1134,7 +1134,8 @@
     if (temperature === null || temperature === undefined) return "moderate";
     if (temperature >= 26) return "hot";
     if (temperature >= 20) return "warm";
-    if (temperature >= 12) return "moderate";
+    if (temperature >= 16) return "moderate";
+    if (temperature >= 8)  return "cool";   // FIX Bug 2: "cool"-Pfad war toter Code, jetzt aktiv
     return "cold";
   }
 
@@ -1552,12 +1553,12 @@
     "Basilikum": {
       stufen: [
         { maxDm: 11,  mlMin: 100,  mlMax: 180,  tagMin: 1,  tagMax: 2,  label: "Klein (bis 11 cm)" },
-        { maxDm: 16,  mlMin: 180,  mlMax: 320,  tagMin: 2,  tagMax: 3,  label: "Mittel (12–16 cm)" },
-        { maxDm: 99,  mlMin: 320,  mlMax: 550,  tagMin: 2,  tagMax: 4,  label: "Groß (17 cm+)" },
+        { maxDm: 16,  mlMin: 180,  mlMax: 320,  tagMin: 1,  tagMax: 2,  label: "Mittel (12–16 cm)" },
+        { maxDm: 99,  mlMin: 320,  mlMax: 550,  tagMin: 1,  tagMax: 2,  label: "Groß (17 cm+)" },
       ],
       winterFaktor: 1.3,
       standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 1.0 },
-      hinweis: "Basilikum braucht gleichmäßig feuchte Erde — nie austrocknen lassen. Im Winter etwas weniger.",
+      hinweis: "Basilikum braucht täglich Kontrolle — Erde niemals austrocknen lassen. Morgens gießen, nie auf Blätter.",
     },
     "Minze": {
       stufen: [
@@ -1669,6 +1670,57 @@
       standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.75, "Innenraum": 0.9 },
       hinweis: "Im Herbst/Winter Gießintervall um ca. 50% verlängern und Menge leicht reduzieren.",
     },
+    // Neue Profile (fehlende Pflanzen in PLANT_DB)
+    "Aloe Vera": {
+      stufen: [
+        { maxDm: 12,  mlMin: 30,   mlMax: 60,   tagMin: 14, tagMax: 21, label: "Klein (bis 12 cm)" },
+        { maxDm: 18,  mlMin: 60,   mlMax: 110,  tagMin: 14, tagMax: 21, label: "Mittel (13–18 cm)" },
+        { maxDm: 99,  mlMin: 110,  mlMax: 200,  tagMin: 21, tagMax: 28, label: "Groß (19 cm+)" },
+      ],
+      winterFaktor: 3.0,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 0.85 },
+      hinweis: "Aloe Vera verträgt kein Staunasser — lieber zu wenig als zu viel. Im Winter fast nicht gießen (alle 4–8 Wochen).",
+    },
+    "Elefantenfuß": {
+      stufen: [
+        { maxDm: 14,  mlMin: 40,   mlMax: 80,   tagMin: 14, tagMax: 21, label: "Klein (bis 14 cm)" },
+        { maxDm: 21,  mlMin: 80,   mlMax: 150,  tagMin: 14, tagMax: 21, label: "Mittel (15–21 cm)" },
+        { maxDm: 99,  mlMin: 150,  mlMax: 280,  tagMin: 21, tagMax: 30, label: "Groß (22 cm+)" },
+      ],
+      winterFaktor: 3.5,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.7, "Innenraum": 0.85 },
+      hinweis: "Der Elefantenfuß speichert Wasser im Stamm — sehr trockenheitsverträglich. Im Winter kaum gießen.",
+    },
+    "Bambus": {
+      stufen: [
+        { maxDm: 16,  mlMin: 250,  mlMax: 450,  tagMin: 2,  tagMax: 4,  label: "Jung (bis 16 cm)" },
+        { maxDm: 24,  mlMin: 500,  mlMax: 900,  tagMin: 2,  tagMax: 3,  label: "Mittel (17–24 cm)" },
+        { maxDm: 99,  mlMin: 900,  mlMax: 1800, tagMin: 1,  tagMax: 2,  label: "Groß (25 cm+)" },
+      ],
+      winterFaktor: 1.5,
+      standortFaktor: { "Sonne": 1.3, "Halbschatten": 1.1, "Schatten": 0.9, "Innenraum": 1.0 },
+      hinweis: "Bambus ist sehr durstig — Erde sollte immer leicht feucht sein. Nie austrocknen lassen, auch im Winter.",
+    },
+    "Spuckpalme": {
+      stufen: [
+        { maxDm: 13,  mlMin: 80,   mlMax: 150,  tagMin: 5,  tagMax: 7,  label: "Klein (bis 13 cm)" },
+        { maxDm: 19,  mlMin: 150,  mlMax: 280,  tagMin: 6,  tagMax: 9,  label: "Mittel (14–19 cm)" },
+        { maxDm: 99,  mlMin: 280,  mlMax: 500,  tagMin: 7,  tagMax: 10, label: "Groß (20 cm+)" },
+      ],
+      winterFaktor: 1.8,
+      standortFaktor: { "Sonne": 1.1, "Halbschatten": 1.0, "Schatten": 0.85, "Innenraum": 0.9 },
+      hinweis: "Robuste Zimmerpflanze — im Winter deutlich weniger gießen.",
+    },
+    "Filzige": {
+      stufen: [
+        { maxDm: 13,  mlMin: 100,  mlMax: 180,  tagMin: 5,  tagMax: 8,  label: "Klein (bis 13 cm)" },
+        { maxDm: 20,  mlMin: 180,  mlMax: 320,  tagMin: 6,  tagMax: 9,  label: "Mittel (14–20 cm)" },
+        { maxDm: 99,  mlMin: 320,  mlMax: 550,  tagMin: 7,  tagMax: 10, label: "Groß (21 cm+)" },
+      ],
+      winterFaktor: 1.6,
+      standortFaktor: { "Sonne": 1.2, "Halbschatten": 1.0, "Schatten": 0.8, "Innenraum": 0.9 },
+      hinweis: "Filzige Blätter nie direkt benetzen — nur in die Erde gießen, um Fäulnis zu vermeiden.",
+    },
   };
 
   // NEU: Hauptfunktion Wasserbedarfsberechnung
@@ -1678,58 +1730,86 @@
   //   pflanzenart  – Schlüssel aus WASSERBEDARF_PROFIL
   //   standort     – "Sonne" | "Halbschatten" | "Schatten" | "Innenraum"
   //   saison       – "sommer" | "winter" (optional, default: automatisch nach Monat)
-  function berechneWasserbedarf(durchmesser, pflanzenart, standort, saison) {
+  // berechneWasserbedarf — gibt NUR noch Wassermenge zurück.
+  // Intervall kommt ausschließlich aus getEnhancedWateringInterval (System 1).
+  function berechneWasserbedarf(durchmesser, pflanzenart, standort, saison, plant, room) {
     if (!durchmesser || durchmesser <= 0) return null;
 
-    // Saison automatisch ermitteln wenn nicht übergeben (März–Sept = Sommer)
     if (!saison) {
-      const monat = new Date().getMonth() + 1; // 1–12
-      saison = (monat >= 3 && monat <= 9) ? "sommer" : "winter";
+      const season = getCurrentSeason();
+      saison = (season === "summer" || season === "spring") ? "sommer" : "winter";
     }
 
-    const profil = WASSERBEDARF_PROFIL[pflanzenart] || WASSERBEDARF_PROFIL["Andere"];
-
-    // Passende Topfgrößen-Stufe finden
-    const stufe = profil.stufen.find(s => durchmesser <= s.maxDm) || profil.stufen[profil.stufen.length - 1];
-
-    // Standortfaktor anwenden
+    const profil  = WASSERBEDARF_PROFIL[pflanzenart] || WASSERBEDARF_PROFIL["Andere"];
+    const stufe   = profil.stufen.find(s => durchmesser <= s.maxDm) || profil.stufen[profil.stufen.length - 1];
     const sFaktor = profil.standortFaktor[standort] || 1.0;
 
-    // Basis-Wassermenge (Mittelwert der Stufe × Standortfaktor)
-    const mlBasisMin = Math.round(stufe.mlMin * sFaktor);
-    const mlBasisMax = Math.round(stufe.mlMax * sFaktor);
+    let mlMin = Math.round(stufe.mlMin * sFaktor);
+    let mlMax = Math.round(stufe.mlMax * sFaktor);
 
-    // Basis-Intervall
-    let tagMin = stufe.tagMin;
-    let tagMax = stufe.tagMax;
-    let mlMin = mlBasisMin;
-    let mlMax = mlBasisMax;
-
-    // Winter-Anpassung
     if (saison === "winter") {
-      mlMin  = Math.round(mlBasisMin * 0.7);  // ~30% weniger
-      mlMax  = Math.round(mlBasisMax * 0.75);
-      tagMin = Math.round(tagMin * profil.winterFaktor);
-      tagMax = Math.round(tagMax * profil.winterFaktor);
+      mlMin = Math.round(mlMin * 0.7);
+      mlMax = Math.round(mlMax * 0.75);
+    }
+
+    // Intervall: System 1 ist die einzige Quelle
+    let interval = null;
+    if (plant) {
+      const adaptive = getEnhancedWateringInterval(plant, room || null);
+      interval = adaptive?.interval ?? null;
     }
 
     return {
       mlMin, mlMax,
-      tagMin, tagMax,
+      interval,
       label: stufe.label,
       saison,
       hinweis: profil.hinweis,
-      // Einzelwert für Rückwärtskompatibilität (Mitte des Bereichs)
       ml: Math.round((mlMin + mlMax) / 2),
     };
   }
 
   // NEU: Hilfsfunktion — Standort aus Raumobjekt ableiten für Gießplan
   function getStandortFromRoom(room) {
-    if (!room) return "Innenraum";
+    if (!room || !room.name) return "Innenraum";
+    const name = room.name.toLowerCase();
+    if (name.includes("balkon") || name.includes("terrasse")) return "Sonne";
+    if (name.includes("garten") || name.includes("außen")) return "Sonne";
+    if (name.includes("bad")) return "Schatten";
+    if (name.includes("küche") || name.includes("kitchen")) return "Innenraum";
+    return "Innenraum";
+  }
+
+  // FIX Bug 7: Erweiterte Standort-Ermittlung für Gießmengenberechnung.
+  // Priorität: 1) plant.wasser_standort (manuell gesetzt, höchste Priorität)
+  //            2) Raumtyp-Ableitung (Balkon/Garten → Sonne, Bad → Schatten)
+  //            3) Licht-Ableitung aus aiData oder PLANT_DB → gemappt auf Standort-Key.
+  // So wird "Halbschatten" und "Schatten" aus den Pflanzendaten endlich aktiv genutzt.
+  function getStandortForPlant(plant, room) {
+    // 1. Manuell gesetzt → immer bevorzugen
+    if (plant && plant.wasser_standort) return plant.wasser_standort;
+
+    // 2. Raumtyp-basiert (Außenstandorte)
     const loc = getLocationFromRoom(room);
     if (loc === "balcony" || loc === "garden") return "Sonne";
     if (loc === "bathroom") return "Schatten";
+
+    // 3. Licht aus aiData oder PLANT_DB → Standort-Key ableiten
+    const lightRaw = (plant?.aiData?.light || PLANT_DB[plant?.type]?.light || "").toLowerCase();
+    if (!lightRaw) return "Innenraum";
+
+    if (lightRaw.includes("volle sonne") || lightRaw.includes("direkte sonne") || lightRaw.includes("direkt")) {
+      return "Sonne";
+    }
+    if (lightRaw.includes("halbschatten") || lightRaw.includes("wenig")) {
+      return "Halbschatten";
+    }
+    if (lightRaw.includes("schatten")) {
+      return "Schatten";
+    }
+    if (lightRaw.includes("indirekt") || lightRaw.includes("hell")) {
+      return "Halbschatten";
+    }
     return "Innenraum";
   }
 
@@ -1859,16 +1939,26 @@
   function SettingsView() {
     const [apiKeyInput, setApiKeyInput] = useState(getApiKey());
     const [saved, setSaved] = useState(false);
+    const [replicateKeyInput, setReplicateKeyInput] = useState(getReplicateKey());
+    const [replicateSaved, setReplicateSaved] = useState(false);
+    const [showReplicateKey, setShowReplicateKey] = useState(false);
     const [theme, setTheme] = useState(getTheme());
     const [showApiKey, setShowApiKey] = useState(false);
     const [showExportDone, setShowExportDone] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const hasKey = apiKeyInput.trim().length > 0;
+    const hasReplicateKey = replicateKeyInput.trim().length > 0;
 
     const handleSave = () => {
       setApiKey(apiKeyInput.trim());
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
+    };
+
+    const handleReplicateSave = () => {
+      setReplicateKey(replicateKeyInput.trim());
+      setReplicateSaved(true);
+      setTimeout(() => setReplicateSaved(false), 2500);
     };
 
     const toggleTheme = () => {
@@ -1895,6 +1985,7 @@
         localStorage.removeItem("pflanzenpflege_v1");
         localStorage.removeItem("pflanzen_rooms");
         localStorage.removeItem("pflanzen_weather_cache");
+        clearIconCache();
         window.location.reload();
       } catch(e) {}
     };
@@ -2018,6 +2109,59 @@
           "Kostenlosen Key auf ",
           React.createElement('a', { href: "https://console.groq.com", target: "_blank", style: { color: C.accent, textDecoration: "none", fontWeight: 500 } }, "console.groq.com"),
           " erstellen."
+        )
+      ),
+
+      // ── Abschnitt: Replicate API Key ──
+      React.createElement('div', { style: cardStyle(0.13) },
+        // Header row
+        React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16 } },
+          iconBubble("🎨", "#F0FDF4"),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('p', { style: { fontSize: 15, fontWeight: 500, color: C.text } }, "Replicate API-Key"),
+            React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } },
+              React.createElement('div', {
+                style: { width: 7, height: 7, borderRadius: "50%", background: hasReplicateKey ? C.accent : C.muted, flexShrink: 0 }
+              }),
+              React.createElement('p', { style: { fontSize: 12, color: hasReplicateKey ? C.accent : C.muted } }, hasReplicateKey ? "Verbunden" : "Nicht konfiguriert")
+            )
+          )
+        ),
+        // Input row
+        React.createElement('div', { style: { position: "relative", marginBottom: 12 } },
+          React.createElement('input', {
+            value: replicateKeyInput,
+            onChange: e => setReplicateKeyInput(e.target.value),
+            placeholder: "r8_...",
+            type: showReplicateKey ? "text" : "password",
+            style: { width: "100%", background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "13px 16px", paddingRight: 48, fontSize: 13, color: C.text, outline: "none", WebkitAppearance: "none", transition: "border-color 0.2s", fontFamily: "monospace" }
+          }),
+          React.createElement('button', {
+            onClick: () => setShowReplicateKey(!showReplicateKey),
+            style: { position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: C.muted }
+          }, showReplicateKey ? "🙈" : "👁")
+        ),
+        React.createElement('button', {
+          onClick: handleReplicateSave,
+          className: "btn-primary",
+          style: {
+            background: replicateSaved ? C.accent : C.text,
+            color: replicateSaved ? "#fff" : C.bg,
+            border: "none", borderRadius: 12, padding: "13px 20px",
+            fontSize: 14, fontWeight: 500, cursor: "pointer", width: "100%",
+            transition: "background 0.2s, color 0.2s",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+          }
+        },
+          replicateSaved ?
+            React.createElement('span', { className: "anim-check-pop" }, "✓ Gespeichert") :
+            "Speichern"
+        ),
+        // Help hint
+        React.createElement('p', { style: { fontSize: 12, color: C.muted, marginTop: 12, lineHeight: 1.6 } },
+          "Für KI-generierte Pflanzensymbole (FLUX.1). Key auf ",
+          React.createElement('a', { href: "https://replicate.com/account/api-tokens", target: "_blank", style: { color: C.accent, textDecoration: "none", fontWeight: 500 } }, "replicate.com"),
+          " erstellen. Ca. $0.003 pro Icon."
         )
       ),
 
@@ -2694,6 +2838,29 @@ Nur JSON, keine Erklärungen.`;
     const [refreshing, setRefreshing] = useState(false);
     const [refreshMsg, setRefreshMsg] = useState(null);
     const [showIconPicker, setShowIconPicker] = useState(false);
+    const [iconGenerating, setIconGenerating] = useState(false);
+    const [iconMsg, setIconMsg] = useState(null);
+
+    const handleGenerateIcon = async () => {
+      if (!getReplicateKey()) {
+        setIconMsg({ type: "error", text: "Kein Replicate API-Key – bitte in Einstellungen eintragen." });
+        setTimeout(() => setIconMsg(null), 3500);
+        return;
+      }
+      setIconGenerating(true);
+      setIconMsg(null);
+      try {
+        const plantLabel = plant.name || plant.type;
+        const url = await getAIPlantIcon(plantLabel);
+        onUpdatePlant(plant.id, { custom_icon: url });
+        setIconMsg({ type: "ok", text: "Icon gespeichert ✓" });
+      } catch(e) {
+        setIconMsg({ type: "error", text: e.message || "Fehler beim Generieren." });
+      } finally {
+        setIconGenerating(false);
+        setTimeout(() => setIconMsg(null), 3500);
+      }
+    };
     const adaptive = room ? getEnhancedWateringInterval(plant, room) : null;
     const daysUntilVal = room ? daysUntilAdaptive(plant, [room]) : daysUntil(plant);
     const hasAiData = plant.aiData && Object.keys(plant.aiData).length > 0;
@@ -2795,6 +2962,11 @@ Nur JSON, keine Erklärungen.`;
               onClick: handleRefresh, disabled: refreshing,
               style: { background: refreshing ? C.inputBg : C.accentLight, border: `1px solid ${C.accent}40`, borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 500, cursor: refreshing ? "default" : "pointer", color: C.accent, display: "flex", alignItems: "center", gap: 5, transition: "all 0.2s" }
             }, refreshing ? "⏳ Lädt…" : "🤖 Aktualisieren"),
+            React.createElement('button', {
+              onClick: handleGenerateIcon, disabled: iconGenerating,
+              title: "KI-Icon mit Replicate generieren",
+              style: { background: iconGenerating ? C.inputBg : "#F0FDF4", border: `1px solid #86EFAC`, borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 500, cursor: iconGenerating ? "default" : "pointer", color: "#16A34A", display: "flex", alignItems: "center", gap: 5, transition: "all 0.2s" }
+            }, iconGenerating ? "⏳ Generiert…" : "🎨 Icon"),
             React.createElement('button', { onClick: () => setShowDelete(!showDelete), style: { background: C.dangerLight, border: `1px solid ${C.dangerBorder}`, borderRadius: 10, padding: "8px 10px", fontSize: 14, cursor: "pointer", color: C.danger } }, "🗑")
           )
         ),
@@ -2862,6 +3034,11 @@ Nur JSON, keine Erklärungen.`;
         ),
 
         // Refresh message
+        iconMsg && React.createElement('div', {
+          className: "anim-fade-up",
+          style: { background: iconMsg.type === "ok" ? C.accentLight : C.warnLight, border: `1px solid ${iconMsg.type === "ok" ? C.accent + "60" : C.warnBorder}`, borderRadius: 12, padding: "10px 14px", margin: "0 20px 8px", fontSize: 13, color: iconMsg.type === "ok" ? C.accent : C.warn }
+        }, iconMsg.text),
+
         refreshMsg && React.createElement('div', { style: { background: refreshMsg.type === "ok" ? C.accentLight : C.warnLight, border: `1px solid ${refreshMsg.type === "ok" ? C.accent : C.warnBorder}`, borderRadius: 10, padding: "8px 14px", marginBottom: 12, fontSize: 13, color: refreshMsg.type === "ok" ? C.accent : C.warn, animation: "fadeIn 0.2s ease both" } }, refreshMsg.text),
 
         // Delete confirm inline
@@ -3024,9 +3201,14 @@ Nur JSON, keine Erklärungen.`;
             ),
             // Standort-Dropdown für Wasserberechnung
             React.createElement('div', { style: { marginBottom: 12 } },
-              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "Standort (für Berechnung)"),
+              React.createElement('p', { style: { fontSize: 12, color: C.muted, marginBottom: 6 } },
+                "Standort (für Berechnung)",
+                !plant.wasser_standort && React.createElement('span', {
+                  style: { fontSize: 10, color: C.accent, marginLeft: 6, fontStyle: "italic" }
+                }, `→ Auto: ${getStandortForPlant(plant, room)}`)
+              ),
               React.createElement('select', {
-                value: plant.wasser_standort || "Innenraum",
+                value: plant.wasser_standort || getStandortForPlant(plant, room),
                 onChange: e => {
                   // NEU: Standort im Plant-Objekt + localStorage speichern
                   onUpdatePlant(plant.id, { wasser_standort: e.target.value });
@@ -3053,7 +3235,7 @@ Nur JSON, keine Erklärungen.`;
                   )
                 );
               }
-              const ergebnis = berechneWasserbedarf(plant.topf_durchmesser, plant.type, plant.wasser_standort || "Innenraum");
+              const ergebnis = berechneWasserbedarf(plant.topf_durchmesser, plant.type, getStandortForPlant(plant, room), null, plant, room);
               if (!ergebnis) return null;
               const isSommer = ergebnis.saison === "sommer";
               const formatMl = ml => ml >= 1000 ? `${(ml/1000).toFixed(1)} L` : `${ml} ml`;
@@ -3090,11 +3272,9 @@ Nur JSON, keine Erklärungen.`;
                   },
                     React.createElement('p', { style: { fontSize: 10, color: C.muted, marginBottom: 4 } }, "Gießintervall"),
                     React.createElement('p', { style: { fontSize: 17, fontWeight: 700, color: C.text } },
-                      ergebnis.tagMin === ergebnis.tagMax
-                        ? `alle ${ergebnis.tagMin} Tage`
-                        : `alle ${ergebnis.tagMin}–${ergebnis.tagMax} Tage`
+                      ergebnis.interval ? `alle ${ergebnis.interval} Tage` : "–"
                     ),
-                    React.createElement('p', { style: { fontSize: 10, color: C.muted, marginTop: 2 } }, "Richtwert")
+                    React.createElement('p', { style: { fontSize: 10, color: C.muted, marginTop: 2 } }, "inkl. Saison & Wetter")
                   )
                 ),
                 // Saisonhinweis
@@ -3186,6 +3366,7 @@ Nur JSON, keine Erklärungen.`;
 
   const GROQ_MODEL = "llama-3.1-8b-instant";
   const STORAGE_KEY_API = "pflanzen_groq_api_key";
+  const STORAGE_KEY_REPLICATE = "pflanzen_replicate_api_key";
   
   function getApiKey() {
     try { return localStorage.getItem(STORAGE_KEY_API) || ""; } catch { return ""; }
@@ -3193,6 +3374,87 @@ Nur JSON, keine Erklärungen.`;
   function setApiKey(key) {
     try { localStorage.setItem(STORAGE_KEY_API, key); } catch {}
   }
+  function getReplicateKey() {
+    try { return localStorage.getItem(STORAGE_KEY_REPLICATE) || ""; } catch { return ""; }
+  }
+  function setReplicateKey(key) {
+    try { localStorage.setItem(STORAGE_KEY_REPLICATE, key); } catch {}
+  }
+
+  // ── PlantIconService (inline, kein import.meta.env) ──────────────────────
+  const PLANT_ICON_CACHE_KEY = "plant_icon_cache";
+
+  function loadIconCache() {
+    try { return JSON.parse(localStorage.getItem(PLANT_ICON_CACHE_KEY) || "{}"); } catch { return {}; }
+  }
+  function saveIconToCache(plantName, iconUrl) {
+    const cache = loadIconCache();
+    cache[plantName.toLowerCase()] = { url: iconUrl, generatedAt: Date.now() };
+    try { localStorage.setItem(PLANT_ICON_CACHE_KEY, JSON.stringify(cache)); } catch {}
+  }
+  function getIconFromCache(plantName) {
+    const cache = loadIconCache();
+    return cache[plantName.toLowerCase()]?.url || null;
+  }
+  function buildIconPrompt(plantName) {
+    return (
+      `A minimalist botanical sticker illustration of a ${plantName}. ` +
+      `The plant is depicted with its most distinctive leaves and shape, ` +
+      `centered in the frame with smooth rounded lines and clean black outlines. ` +
+      `Color palette: soft sage green, muted olive, and warm cream tones. ` +
+      `Flat design with subtle shading, no shadows, no background, ` +
+      `suitable as a mobile app icon.`
+    );
+  }
+  async function generateIconWithReplicate(plantName) {
+    const token = getReplicateKey();
+    if (!token) throw new Error("Kein Replicate API-Key konfiguriert.");
+    const response = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: "wait",
+      },
+      body: JSON.stringify({
+        input: {
+          prompt: buildIconPrompt(plantName),
+          num_outputs: 1,
+          aspect_ratio: "1:1",
+          output_format: "webp",
+          output_quality: 80,
+        },
+      }),
+    });
+    if (!response.ok) throw new Error(`Replicate API Fehler: ${response.status}`);
+    const prediction = await response.json();
+    if (prediction.output && prediction.output.length > 0) return prediction.output[0];
+    throw new Error("Kein Output von Replicate erhalten");
+  }
+  async function getAIPlantIcon(plantName) {
+    const cached = getIconFromCache(plantName);
+    if (cached) { console.log(`[PlantIcon] Cache hit: ${plantName}`); return cached; }
+    console.log(`[PlantIcon] Generiere Icon für: ${plantName}`);
+    const iconUrl = await generateIconWithReplicate(plantName);
+    saveIconToCache(plantName, iconUrl);
+    console.log(`[PlantIcon] Gespeichert: ${plantName} → ${iconUrl}`);
+    return iconUrl;
+  }
+  function getAIIconCacheStats() {
+    const cache = loadIconCache();
+    const entries = Object.entries(cache);
+    return {
+      totalCached: entries.length,
+      plants: entries.map(([name, data]) => ({
+        name,
+        generatedAt: new Date(data.generatedAt).toLocaleDateString("de-DE"),
+      })),
+    };
+  }
+  function clearIconCache() {
+    try { localStorage.removeItem(PLANT_ICON_CACHE_KEY); } catch {}
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const plantCache = {};
 
@@ -3325,6 +3587,25 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [matchInfo, setMatchInfo] = useState(null);
+    const [aiIcon, setAiIcon] = useState(null);
+    const [aiIconLoading, setAiIconLoading] = useState(false);
+    const [aiIconMsg, setAiIconMsg] = useState(null);
+
+    const handleGenerateIconPreview = async () => {
+      if (!name.trim()) { setAiIconMsg({ type: "error", text: "Bitte zuerst den Pflanzennamen eingeben." }); setTimeout(() => setAiIconMsg(null), 3000); return; }
+      if (!getReplicateKey()) { setAiIconMsg({ type: "error", text: "Kein Replicate API-Key – bitte in Einstellungen eintragen." }); setTimeout(() => setAiIconMsg(null), 3500); return; }
+      setAiIconLoading(true); setAiIconMsg(null);
+      try {
+        const url = await getAIPlantIcon(name.trim());
+        setAiIcon(url);
+        setAiIconMsg({ type: "ok", text: "Icon wird beim Speichern übernommen ✓" });
+      } catch(e) {
+        setAiIconMsg({ type: "error", text: e.message || "Fehler beim Generieren." });
+      } finally {
+        setAiIconLoading(false);
+        setTimeout(() => setAiIconMsg(null), 3500);
+      }
+    };
 
     const submit = async () => {
       if (!name.trim()) return;
@@ -3410,6 +3691,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           room_id: roomId || null,
           topf_durchmesser: topfDurchmesser ? parseInt(topfDurchmesser) : null,  // NEU
           wasser_standort: wasserStandort,                                          // NEU
+          custom_icon: aiIcon || null,
         };
         onAdd(newPlant);
       } catch (e) {
@@ -3452,6 +3734,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
           room_id: roomId || null,
           topf_durchmesser: topfDurchmesser ? parseInt(topfDurchmesser) : null,  // NEU
           wasser_standort: wasserStandort,                                          // NEU
+          custom_icon: aiIcon || null,
         };
         onAdd(newPlant);
       } finally {
@@ -3476,6 +3759,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         room_id: roomId || null,
         topf_durchmesser: topfDurchmesser ? parseInt(topfDurchmesser) : null,  // NEU
         wasser_standort: wasserStandort,                                          // NEU
+        custom_icon: aiIcon || null,
       };
       onAdd(newPlant);
     };
@@ -3521,6 +3805,34 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         React.createElement('div', { style: { fontSize: 12, color: C.muted, background: C.accentLight, padding: "10px 14px", borderRadius: 10 } },
           "🤖 Gib den Pflanzennamen ein und klicke auf 'Pflanze hinzufügen' für automatische KI-Pflegeinfos"
         ),
+
+        // ── KI-Icon Generator ──────────────────────────────────────────────
+        React.createElement('div', { style: { background: C.card, borderRadius: 16, padding: "16px", border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 10 } },
+          React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+            React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 10 } },
+              // Preview bubble
+              React.createElement('div', { style: { width: 52, height: 52, borderRadius: 14, background: "#F0FDF4", border: "1.5px solid #86EFAC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 } },
+                aiIcon
+                  ? React.createElement('img', { src: aiIcon, alt: "KI Icon", style: { width: 48, height: 48, objectFit: "cover", borderRadius: 10 } })
+                  : React.createElement('span', { style: { fontSize: 24 } }, "🎨")
+              ),
+              React.createElement('div', null,
+                React.createElement('p', { style: { fontSize: 14, fontWeight: 500, color: C.text } }, "KI-Pflanzensymbol"),
+                React.createElement('p', { style: { fontSize: 11, color: C.muted } }, aiIcon ? "Vorschau – wird beim Speichern übernommen" : "Via Replicate FLUX.1 generieren")
+              )
+            ),
+            React.createElement('button', {
+              onClick: handleGenerateIconPreview,
+              disabled: aiIconLoading || !name.trim(),
+              style: { background: aiIconLoading ? C.inputBg : "#F0FDF4", border: "1.5px solid #86EFAC", borderRadius: 12, padding: "9px 14px", fontSize: 12, fontWeight: 500, color: "#16A34A", cursor: aiIconLoading || !name.trim() ? "default" : "pointer", whiteSpace: "nowrap", transition: "all 0.2s" }
+            }, aiIconLoading ? "⏳ Generiert…" : aiIcon ? "🔄 Neu" : "🎨 Generieren")
+          ),
+          aiIconMsg && React.createElement('div', {
+            className: "anim-fade-up",
+            style: { background: aiIconMsg.type === "ok" ? C.accentLight : C.warnLight, border: `1px solid ${aiIconMsg.type === "ok" ? C.accent + "60" : C.warnBorder}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, color: aiIconMsg.type === "ok" ? C.accent : C.warn }
+          }, aiIconMsg.text)
+        ),
+
         // Error message
         error && React.createElement('div', { style: { background: C.warnLight, border: `1px solid ${C.warnBorder}`, borderRadius: 12, padding: "12px 14px", color: C.warn, fontSize: 13 } }, error),
         // Match info / fallback message
@@ -3689,7 +4001,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
                 )
               );
             }
-            const ergebnis = berechneWasserbedarf(dm, type, wasserStandort);
+            const ergebnis = berechneWasserbedarf(dm, type, wasserStandort, null, null, null);
             if (!ergebnis) return null;
             const fmt = ml => ml >= 1000 ? `${(ml/1000).toFixed(1)} L` : `${ml} ml`;
             const isSommer = ergebnis.saison === "sommer";
@@ -3720,11 +4032,8 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
                   style: { flex: 1, background: C.card, borderRadius: 8, padding: "8px 10px", textAlign: "center" }
                 },
                   React.createElement('p', { style: { fontSize: 10, color: C.muted } }, "Intervall"),
-                  React.createElement('p', { style: { fontSize: 13, fontWeight: 700, color: C.text } },
-                    ergebnis.tagMin === ergebnis.tagMax
-                      ? `alle ${ergebnis.tagMin} T.`
-                      : `alle ${ergebnis.tagMin}–${ergebnis.tagMax} T.`
-                  )
+                  React.createElement('p', { style: { fontSize: 13, fontWeight: 700, color: C.text } }, "nach Hinzufügen"),
+                  React.createElement('p', { style: { fontSize: 9, color: C.muted, marginTop: 2 } }, "inkl. Saison & Wetter")
                 )
               )
             );
@@ -3810,9 +4119,9 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         : React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 12 } },
             plants.map((plant, idx) => {
               const room = rooms.find(r => r.id === plant.room_id);
-              const standort = plant.wasser_standort || getStandortFromRoom(room);
+              const standort = getStandortForPlant(plant, room);
               const ergebnis = plant.topf_durchmesser
-                ? berechneWasserbedarf(plant.topf_durchmesser, plant.type, standort)
+                ? berechneWasserbedarf(plant.topf_durchmesser, plant.type, standort, null, plant, room)
                 : null;
               const isEditing = editingId === plant.id;
 
@@ -3849,9 +4158,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
                           })()
                         ),
                         React.createElement('p', { style: { fontSize: 10, color: C.muted, marginTop: 1 } },
-                          ergebnis.tagMin === ergebnis.tagMax
-                            ? `alle ${ergebnis.tagMin} Tage`
-                            : `alle ${ergebnis.tagMin}–${ergebnis.tagMax} Tage`
+                          ergebnis.interval ? `alle ${ergebnis.interval} Tage` : "Intervall folgt"
                         ),
                         React.createElement('span', {
                           style: {
@@ -4142,6 +4449,48 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         const nullTypePlant = { type: null, watering_interval: 7, last_watered_date: null };
         const nullResult = getEnhancedWateringInterval(nullTypePlant, null);
         TestRunner.log('type=null gibt sicheren Fallback', nullResult.interval === 7);
+
+        // ── FIX-REGRESSION: Bug 2 – determineClimate cool-Pfad ──
+        console.log('\n--- Fix-Regression: Bug 2 (determineClimate) ---');
+        TestRunner.log('determineClimate 10°C → cool',  determineClimate(10)  === 'cool',  `got: ${determineClimate(10)}`);
+        TestRunner.log('determineClimate 8°C  → cool',  determineClimate(8)   === 'cool',  `got: ${determineClimate(8)}`);
+        TestRunner.log('determineClimate 7°C  → cold',  determineClimate(7)   === 'cold',  `got: ${determineClimate(7)}`);
+        TestRunner.log('determineClimate 16°C → moderate', determineClimate(16) === 'moderate', `got: ${determineClimate(16)}`);
+        TestRunner.log('determineClimate 20°C → warm',  determineClimate(20)  === 'warm',  `got: ${determineClimate(20)}`);
+
+        // ── FIX-REGRESSION: Bug 5 – Intervall kommt jetzt aus System 1 ──
+        console.log('\n--- Fix-Regression: System-1-Intervall in berechneWasserbedarf ---');
+        const monsteraTestPlant = { type: 'Monstera', watering_interval: 9, last_watered_date: null, wasser_standort: null, aiData: null };
+        const sonneResult = berechneWasserbedarf(20, 'Monstera', 'Sonne', null, monsteraTestPlant, null);
+        const innenResult = berechneWasserbedarf(20, 'Monstera', 'Innenraum', null, monsteraTestPlant, null);
+        TestRunner.log('berechneWasserbedarf liefert interval-Feld', typeof sonneResult.interval === 'number' || sonneResult.interval === null,
+          `interval=${sonneResult.interval}`);
+        TestRunner.log('Sonne mlMax >= Innenraum mlMax', sonneResult.mlMax >= innenResult.mlMax,
+          `Sonne=${sonneResult.mlMax}ml, Innenraum=${innenResult.mlMax}ml`);
+        TestRunner.log('tagMin/tagMax nicht mehr in Ergebnis', !('tagMin' in sonneResult) && !('tagMax' in sonneResult),
+          `tagMin=${'tagMin' in sonneResult}, tagMax=${'tagMax' in sonneResult}`);
+
+        // ── FIX-REGRESSION: Bug 6 – einheitliches Saisonmodell ──
+        console.log('\n--- Fix-Regression: Bug 6 (Saisonmodell) ---');
+        const currentSeason = getCurrentSeason();
+        const expectedSaison = (currentSeason === 'summer' || currentSeason === 'spring') ? 'sommer' : 'winter';
+        const autoResult = berechneWasserbedarf(20, 'Monstera', 'Innenraum', null, null, null);
+        TestRunner.log('berechneWasserbedarf Saison stimmt mit getCurrentSeason überein',
+          autoResult.saison === expectedSaison,
+          `getCurrentSeason()=${currentSeason}, erwartet=${expectedSaison}, got=${autoResult.saison}`);
+
+        // ── FIX-REGRESSION: Bug 7 – getStandortForPlant ──
+        console.log('\n--- Fix-Regression: Bug 7 (getStandortForPlant) ---');
+        const monsteraPlant = { type: 'Monstera', wasser_standort: null, aiData: null };
+        const balkonRoom = { id: 'balkon', name: 'Balkon' };
+        const wohnzimmerRoom = { id: 'wohnzimmer', name: 'Wohnzimmer' };
+        TestRunner.log('Balkon → Sonne', getStandortForPlant(monsteraPlant, balkonRoom) === 'Sonne');
+        // Monstera hat light: "Hell, indirekt" in DB → soll Halbschatten ergeben
+        TestRunner.log('Monstera Wohnzimmer → Halbschatten (aus DB)', getStandortForPlant(monsteraPlant, wohnzimmerRoom) === 'Halbschatten',
+          `got: ${getStandortForPlant(monsteraPlant, wohnzimmerRoom)}`);
+        // Manuell gesetzt hat immer Vorrang
+        const manualPlant = { type: 'Monstera', wasser_standort: 'Sonne', aiData: null };
+        TestRunner.log('Manuell gesetzt hat Vorrang vor Auto', getStandortForPlant(manualPlant, wohnzimmerRoom) === 'Sonne');
 
       } catch(e) { console.error('Test error:', e); }
       return TestRunner.summary();
