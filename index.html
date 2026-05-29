@@ -1942,6 +1942,8 @@
     const [replicateKeyInput, setReplicateKeyInput] = useState(getReplicateKey());
     const [replicateSaved, setReplicateSaved] = useState(false);
     const [showReplicateKey, setShowReplicateKey] = useState(false);
+    const [proxyUrlInput, setProxyUrlInput] = useState(getReplicateProxyUrl());
+    const [proxySaved, setProxySaved] = useState(false);
     const [theme, setTheme] = useState(getTheme());
     const [showApiKey, setShowApiKey] = useState(false);
     const [showExportDone, setShowExportDone] = useState(false);
@@ -1959,6 +1961,12 @@
       setReplicateKey(replicateKeyInput.trim());
       setReplicateSaved(true);
       setTimeout(() => setReplicateSaved(false), 2500);
+    };
+
+    const handleProxySave = () => {
+      setReplicateProxyUrl(proxyUrlInput.trim());
+      setProxySaved(true);
+      setTimeout(() => setProxySaved(false), 2500);
     };
 
     const toggleTheme = () => {
@@ -2162,6 +2170,35 @@
           "Für KI-generierte Pflanzensymbole (FLUX.1). Key auf ",
           React.createElement('a', { href: "https://replicate.com/account/api-tokens", target: "_blank", style: { color: C.accent, textDecoration: "none", fontWeight: 500 } }, "replicate.com"),
           " erstellen. Ca. $0.003 pro Icon."
+        ),
+
+        // Divider
+        React.createElement('div', { style: { height: 1, background: C.border, margin: "16px 0" } }),
+
+        // Proxy URL section
+        React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 } },
+          React.createElement('span', { style: { fontSize: 16 } }, "🔀"),
+          React.createElement('div', null,
+            React.createElement('p', { style: { fontSize: 13, fontWeight: 500, color: C.text } }, "CORS-Proxy URL"),
+            React.createElement('p', { style: { fontSize: 11, color: C.muted } }, proxyUrlInput ? "Aktiv – Requests laufen über Proxy" : "Leer = direkter API-Call (nur lokal)")
+          )
+        ),
+        React.createElement('input', {
+          value: proxyUrlInput,
+          onChange: e => setProxyUrlInput(e.target.value),
+          placeholder: "https://dein-worker.workers.dev",
+          type: "url",
+          style: { width: "100%", background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "11px 14px", fontSize: 13, color: C.text, outline: "none", WebkitAppearance: "none", marginBottom: 10, fontFamily: "monospace" }
+        }),
+        React.createElement('button', {
+          onClick: handleProxySave,
+          className: "btn-primary",
+          style: { background: proxySaved ? C.accent : C.inputBg, color: proxySaved ? "#fff" : C.text, border: `1px solid ${C.border}`, borderRadius: 12, padding: "11px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", width: "100%", transition: "background 0.2s, color 0.2s" }
+        }, proxySaved ? "✓ Gespeichert" : "Proxy speichern"),
+        React.createElement('p', { style: { fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.6 } },
+          "Nötig auf GitHub Pages. Cloudflare Worker als Proxy deployen – Anleitung in der ",
+          React.createElement('a', { href: "https://dash.cloudflare.com/?to=/:account/workers", target: "_blank", style: { color: C.accent, textDecoration: "none" } }, "Cloudflare Console"),
+          "."
         )
       ),
 
@@ -3374,11 +3411,18 @@ Nur JSON, keine Erklärungen.`;
   function setApiKey(key) {
     try { localStorage.setItem(STORAGE_KEY_API, key); } catch {}
   }
+  const STORAGE_KEY_REPLICATE_PROXY = "pflanzen_replicate_proxy_url";
   function getReplicateKey() {
     try { return localStorage.getItem(STORAGE_KEY_REPLICATE) || ""; } catch { return ""; }
   }
   function setReplicateKey(key) {
     try { localStorage.setItem(STORAGE_KEY_REPLICATE, key); } catch {}
+  }
+  function getReplicateProxyUrl() {
+    try { return localStorage.getItem(STORAGE_KEY_REPLICATE_PROXY) || ""; } catch { return ""; }
+  }
+  function setReplicateProxyUrl(url) {
+    try { localStorage.setItem(STORAGE_KEY_REPLICATE_PROXY, url); } catch {}
   }
 
   // ── PlantIconService (inline, kein import.meta.env) ──────────────────────
@@ -3409,7 +3453,9 @@ Nur JSON, keine Erklärungen.`;
   async function generateIconWithReplicate(plantName) {
     const token = getReplicateKey();
     if (!token) throw new Error("Kein Replicate API-Key konfiguriert.");
-    const response = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", {
+    const proxyUrl = getReplicateProxyUrl();
+    const endpoint = proxyUrl.trim() || "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions";
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
