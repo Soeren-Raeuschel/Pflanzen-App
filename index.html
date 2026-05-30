@@ -704,10 +704,12 @@
 
   function renderPlantIcon(plant, size, extraStyle) {
     if (plant?.custom_icon && isIconUrl(plant.custom_icon)) {
+      // Strip background/padding from extraStyle — image fills the space itself
+      const { background, padding, ...restStyle } = extraStyle || {};
       return React.createElement('img', {
         src: plant.custom_icon,
         alt: plant.name || plant.type || "Pflanze",
-        style: { width: size, height: size, borderRadius: Math.round(size * 0.25), objectFit: "cover", flexShrink: 0, ...(extraStyle || {}) }
+        style: { width: size, height: size, borderRadius: Math.round(size * 0.25), objectFit: "cover", flexShrink: 0, ...restStyle }
       });
     }
     return React.createElement(PlantSvgIcon, { type: getSvgType(plant), size, style: extraStyle });
@@ -3034,10 +3036,10 @@ Nur JSON, keine Erklärungen.`;
             React.createElement('button', {
               onClick: () => setShowIconPicker(!showIconPicker),
               title: "Icon ändern",
-              style: { width: 72, height: 72, borderRadius: 20, background: water ? C.warnLight : C.accentLight, border: `2px solid ${showIconPicker ? C.accent : (water ? C.warnBorder : C.accent + "40")}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 4, transition: "border-color 0.2s" }
+              style: { width: 72, height: 72, borderRadius: 20, background: isIconUrl(plant.custom_icon) ? "transparent" : (water ? C.warnLight : C.accentLight), border: `2px solid ${showIconPicker ? C.accent : (water ? C.warnBorder : C.accent + "40")}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: isIconUrl(plant.custom_icon) ? 0 : 4, overflow: "hidden", transition: "border-color 0.2s" }
             },
               isIconUrl(plant.custom_icon)
-                ? React.createElement('img', { src: plant.custom_icon, alt: plant.name, style: { width: 60, height: 60, borderRadius: 16, objectFit: "cover", display: "block" }, className: "anim-leaf-icon" })
+                ? React.createElement('img', { src: plant.custom_icon, alt: plant.name, style: { width: 72, height: 72, objectFit: "cover", display: "block", borderRadius: 18 }, className: "anim-leaf-icon" })
                 : plant.custom_icon
                   ? React.createElement('span', { className: "anim-leaf-icon", style: { fontSize: 38, lineHeight: 1, display: "block" } }, plant.custom_icon)
                   : React.createElement(PlantSvgIcon, { type: getSvgType(plant), size: 60, style: { display: "block" }, className: "anim-leaf-icon" }),
