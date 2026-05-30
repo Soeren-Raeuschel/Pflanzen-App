@@ -3043,8 +3043,8 @@ Nur JSON, keine Erklärungen.`;
                 : plant.custom_icon
                   ? React.createElement('span', { className: "anim-leaf-icon", style: { fontSize: 38, lineHeight: 1, display: "block" } }, plant.custom_icon)
                   : React.createElement(PlantSvgIcon, { type: getSvgType(plant), size: 60, style: { display: "block" }, className: "anim-leaf-icon" }),
-              React.createElement('span', { style: { fontSize: 9, color: C.muted, marginTop: 1, letterSpacing: "0.03em", minHeight: 16 } }, "✏️ Icon")
             ),
+            React.createElement('span', { style: { fontSize: 9, color: C.muted, marginTop: 3, letterSpacing: "0.03em", display: "block", textAlign: "center" } }, "✏️ Icon"),
             // Emoji picker dropdown
             showIconPicker && React.createElement('div', {
               className: "anim-emoji-picker",
