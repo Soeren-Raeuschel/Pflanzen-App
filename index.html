@@ -2909,6 +2909,10 @@ Nur JSON, keine Erklärungen.`;
       setIconMsg(null);
       try {
         const plantLabel = plant.name || plant.type;
+        // Cache für diesen Namen leeren → erzwingt Neu-Generierung
+        const cache = loadIconCache();
+        delete cache[plantLabel.toLowerCase()];
+        try { localStorage.setItem(PLANT_ICON_CACHE_KEY, JSON.stringify(cache)); } catch {}
         const url = await getAIPlantIcon(plantLabel);
         // Icon für alle Pflanzen mit gleichem Namen setzen
         if (onUpdatePlantsByName) {
@@ -3479,12 +3483,26 @@ Nur JSON, keine Erklärungen.`;
     );
   }
   async function fetchImageAsBase64(imageUrl) {
-    const res = await fetch(imageUrl);
-    if (!res.ok) throw new Error(`Bild-Download fehlgeschlagen: ${res.status}`);
+    // Versuche direkten Fetch; bei CORS-Fehler über den konfigurierten Proxy
+    const tryFetch = async (url, opts) => {
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error(`Bild-Download fehlgeschlagen: ${res.status}`);
+      return res;
+    };
+    let res;
+    try {
+      res = await tryFetch(imageUrl);
+    } catch (directErr) {
+      // Direkter Fetch fehlgeschlagen → Proxy als Fallback
+      const proxy = getReplicateProxyUrl().trim();
+      if (!proxy) throw directErr;
+      // Proxy als einfacher GET-Tunnel: URL als Query-Parameter
+      res = await tryFetch(`${proxy}?url=${encodeURIComponent(imageUrl)}`);
+    }
     const blob = await res.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result); // "data:image/webp;base64,..."
+      reader.onloadend = () => resolve(reader.result);
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
@@ -3686,6 +3704,10 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
       if (!getReplicateKey()) { setAiIconMsg({ type: "error", text: "Kein Replicate API-Key – bitte in Einstellungen eintragen." }); setTimeout(() => setAiIconMsg(null), 3500); return; }
       setAiIconLoading(true); setAiIconMsg(null);
       try {
+        // Cache leeren → erzwingt frische Generierung (kein abgelaufenes Icon)
+        const cache = loadIconCache();
+        delete cache[name.trim().toLowerCase()];
+        try { localStorage.setItem(PLANT_ICON_CACHE_KEY, JSON.stringify(cache)); } catch {}
         const url = await getAIPlantIcon(name.trim());
         setAiIcon(url);
         setAiIconMsg({ type: "ok", text: "Icon wird beim Speichern übernommen ✓" });
@@ -4338,10 +4360,27 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
         const saved = localStorage.getItem("pflanzenpflege_v1");
         if (saved) {
           const data = JSON.parse(saved);
-          const migrated = data.map(p => ({
-            ...p,
-            last_watered_date: p.last_watered_date || p.lastWatered || null
-          }));
+          const migrated = data.map(p => {
+            let custom_icon = p.custom_icon || null;
+            // Abgelaufene Replicate-URLs ersetzen: prüfe ob Cache eine Base64-Version hat
+            if (custom_icon && !custom_icon.startsWith("data:image/") &&
+                (custom_icon.startsWith("https://replicate.delivery") || custom_icon.startsWith("https://pbxt."))) {
+              const cachedBase64 = getIconFromCache(p.name || p.type || "");
+              if (cachedBase64 && cachedBase64.startsWith("data:image/")) {
+                custom_icon = cachedBase64; // Cache-Treffer → Base64 verwenden
+              } else {
+                // Kein Cache → URL als "pending" markieren statt null
+                // Icon wird beim nächsten 🎨-Klick neu generiert
+                custom_icon = null;
+                console.warn(`[PlantIcon] Abgelaufene URL für "${p.name || p.type}" — bitte Icon neu generieren.`);
+              }
+            }
+            return {
+              ...p,
+              custom_icon,
+              last_watered_date: p.last_watered_date || p.lastWatered || null
+            };
+          });
           setPlants(migrated);
         }
         
@@ -4402,11 +4441,16 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
     const updateCustomName = (id, customName) => save(plants.map(p => p.id === id ? { ...p, custom_name: customName || null } : p));
     const updatePlant = (id, fields) => save(plants.map(p => p.id === id ? { ...p, ...fields } : p));
     // Alle Pflanzen mit gleichem name/type updaten (z.B. Icon für alle Monstera)
+    // Matched auf Gattungsebene: "Monstera Deliciosa" und "Monstera" matchen beide
     const updatePlantsByName = (plantName, fields) => {
-      const label = plantName.toLowerCase();
+      const genus = plantName.toLowerCase().split(/\s+/)[0]; // erstes Wort = Gattung
       save(plants.map(p => {
-        const pLabel = (p.name || p.type || "").toLowerCase();
-        return pLabel === label ? { ...p, ...fields } : p;
+        const pName = (p.name || p.type || "").toLowerCase();
+        const pGenus = pName.split(/\s+/)[0];
+        // Exakter Match ODER Gattungs-Match
+        return (pName === plantName.toLowerCase() || pGenus === genus)
+          ? { ...p, ...fields }
+          : p;
       }));
     };
 
