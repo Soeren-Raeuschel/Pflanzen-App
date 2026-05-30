@@ -3483,22 +3483,10 @@ Nur JSON, keine Erklärungen.`;
     );
   }
   async function fetchImageAsBase64(imageUrl) {
-    // Versuche direkten Fetch; bei CORS-Fehler über den konfigurierten Proxy
-    const tryFetch = async (url, opts) => {
-      const res = await fetch(url, opts);
-      if (!res.ok) throw new Error(`Bild-Download fehlgeschlagen: ${res.status}`);
-      return res;
-    };
-    let res;
-    try {
-      res = await tryFetch(imageUrl);
-    } catch (directErr) {
-      // Direkter Fetch fehlgeschlagen → Proxy als Fallback
-      const proxy = getReplicateProxyUrl().trim();
-      if (!proxy) throw directErr;
-      // Proxy als einfacher GET-Tunnel: URL als Query-Parameter
-      res = await tryFetch(`${proxy}?url=${encodeURIComponent(imageUrl)}`);
-    }
+    // replicate.delivery CDN erlaubt direkte Bild-Fetches (kein CORS-Problem)
+    // Nur der API-Call braucht den Proxy, nicht der Bild-Download
+    const res = await fetch(imageUrl);
+    if (!res.ok) throw new Error(`Bild-Download fehlgeschlagen: ${res.status}`);
     const blob = await res.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
