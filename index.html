@@ -3505,16 +3505,18 @@ Nur JSON, keine Erklärungen.`;
             {
               role: "system",
               content:
-                "You are an expert at writing concise image generation prompts for botanical illustrations. " +
-                "Given a plant name, write a single short prompt (max 60 words) describing a minimalist botanical sticker illustration. " +
-                "Focus on the plant's single most iconic visual feature with botanically accurate colors " +
-                "(e.g. red petals for rose, purple spikes for lavender, fenestrated leaves for monstera, ripe olives for olive tree). " +
+                "You are a botanist writing image generation prompts for minimalist plant sticker illustrations. " +
+                "Given a plant name (possibly in German), identify the correct plant species and its single most iconic visual feature. " +
+                "Use botanical knowledge: Gummibaum = Ficus elastica (large dark glossy leaves, NOT fruit), " +
+                "Monstera = fenestrated leaves, Rose = red/pink flower, Lavendel = purple flower spikes, " +
+                "Feige = fig fruit, Olivenbaum = silver-green leaves with small olives, Kaktus = green cactus with spines. " +
+                "Write a single prompt (max 60 words) focusing on the correct iconic feature with accurate colors. " +
                 "End with: centered, smooth rounded lines, clean black outlines, flat design, subtle shading, no background. " +
-                "Reply with ONLY the prompt text, no explanations.",
+                "Reply with ONLY the prompt text, no explanations, no plant name prefix.",
             },
             {
               role: "user",
-              content: plantName,
+              content: `Plant name: ${plantName}`,
             },
           ],
         }),
