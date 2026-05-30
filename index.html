@@ -2875,7 +2875,7 @@ Nur JSON, keine Erklärungen.`;
   ];
 
   // ── PlantDetail ────────────────────────────────────────
-  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete, onUpdateCustomName, onUpdatePlant }) {
+  function PlantDetail({ plant, room, onBack, onWater, onFertilize, onDelete, onUpdateCustomName, onUpdatePlant, onUpdatePlantsByName }) {
     const info = PLANT_DB[plant.type] || PLANT_DB["Andere"];
     const water = room ? needsWaterAdaptive(plant, [room]) : needsWater(plant);
     const days = daysSince(plant.last_watered_date);
@@ -2910,8 +2910,13 @@ Nur JSON, keine Erklärungen.`;
       try {
         const plantLabel = plant.name || plant.type;
         const url = await getAIPlantIcon(plantLabel);
-        onUpdatePlant(plant.id, { custom_icon: url });
-        setIconMsg({ type: "ok", text: "Icon gespeichert ✓" });
+        // Icon für alle Pflanzen mit gleichem Namen setzen
+        if (onUpdatePlantsByName) {
+          onUpdatePlantsByName(plantLabel, { custom_icon: url });
+        } else {
+          onUpdatePlant(plant.id, { custom_icon: url });
+        }
+        setIconMsg({ type: "ok", text: "Icon für alle gleichnamigen Pflanzen gespeichert ✓" });
       } catch(e) {
         setIconMsg({ type: "error", text: e.message || "Fehler beim Generieren." });
       } finally {
@@ -4396,6 +4401,14 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
     const deletePlant = id => { save(plants.filter(p => p.id !== id)); setSelectedPlant(null); setView("plants"); };
     const updateCustomName = (id, customName) => save(plants.map(p => p.id === id ? { ...p, custom_name: customName || null } : p));
     const updatePlant = (id, fields) => save(plants.map(p => p.id === id ? { ...p, ...fields } : p));
+    // Alle Pflanzen mit gleichem name/type updaten (z.B. Icon für alle Monstera)
+    const updatePlantsByName = (plantName, fields) => {
+      const label = plantName.toLowerCase();
+      save(plants.map(p => {
+        const pLabel = (p.name || p.type || "").toLowerCase();
+        return pLabel === label ? { ...p, ...fields } : p;
+      }));
+    };
 
     if (!loaded) return React.createElement('div', { id: 'loading', style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg } },
       React.createElement('span', { style: { fontSize: 48 } }, "🌿")
@@ -4407,7 +4420,7 @@ Wichtig: fertilizer_interval, repot_months und watering_interval_days müssen Za
       const plant = plants.find(p => p.id === selectedPlant);
       if (!plant) { setSelectedPlant(null); return null; }
       const room = rooms.find(r => r.id === plant.room_id);
-      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName, onUpdatePlant: updatePlant });
+      return React.createElement(PlantDetail, { plant, room, onBack: () => setSelectedPlant(null), onWater: waterPlant, onFertilize: fertilizePlant, onDelete: deletePlant, onUpdateCustomName: updateCustomName, onUpdatePlant: updatePlant, onUpdatePlantsByName: updatePlantsByName });
     }
 
     return React.createElement(React.Fragment, null,
